@@ -286,6 +286,7 @@ mod logging;
 mod router;
 mod server;
 
+pub mod highlevel;
 pub mod test_util;
 
 #[macro_use]
