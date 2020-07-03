@@ -94,7 +94,8 @@ impl ExampleContext {
      * functions), return our application-specific context.
      */
     pub fn from_rqctx(rqctx: &Arc<RequestContext>) -> Arc<ExampleContext> {
-        let ctx: Arc<dyn Any + Send + Sync + 'static> = Arc::clone(&rqctx.server.private);
+        let ctx: Arc<dyn Any + Send + Sync + 'static> =
+            Arc::clone(&rqctx.server.private);
         ctx.downcast::<ExampleContext>()
             .expect("wrong type for private data")
     }

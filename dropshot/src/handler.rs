@@ -114,7 +114,9 @@ pub trait Extractor: Send + Sync + Sized {
     /**
      * Construct an instance of this type from a `RequestContext`.
      */
-    async fn from_request(rqctx: Arc<RequestContext>) -> Result<Self, HttpError>;
+    async fn from_request(
+        rqctx: Arc<RequestContext>,
+    ) -> Result<Self, HttpError>;
 
     fn metadata() -> Vec<ApiEndpointParameter>;
 }
@@ -149,7 +151,8 @@ impl_extractor_for_tuple!(T1, T2);
 impl_extractor_for_tuple!(T1, T2, T3);
 
 pub trait ExtractedParameter: DeserializeOwned {
-    fn metadata(inn: ApiEndpointParameterLocation) -> Vec<ApiEndpointParameter>;
+    fn metadata(inn: ApiEndpointParameterLocation)
+        -> Vec<ApiEndpointParameter>;
 }
 
 /**
@@ -170,12 +173,17 @@ pub trait ExtractedParameter: DeserializeOwned {
  * treat different handlers interchangeably.  See `RouteHandler` below.
  */
 #[async_trait]
-pub trait HttpHandlerFunc<FuncParams, ResponseType>: Send + Sync + 'static
+pub trait HttpHandlerFunc<FuncParams, ResponseType>:
+    Send + Sync + 'static
 where
     FuncParams: Extractor,
     ResponseType: HttpResponse + Send + Sync + 'static,
 {
-    async fn handle_request(&self, rqctx: Arc<RequestContext>, p: FuncParams) -> HttpHandlerResult;
+    async fn handle_request(
+        &self,
+        rqctx: Arc<RequestContext>,
+        p: FuncParams,
+    ) -> HttpHandlerResult;
 }
 
 /**
@@ -371,7 +379,10 @@ where
         &self.label
     }
 
-    async fn handle_request(&self, rqctx_raw: RequestContext) -> HttpHandlerResult {
+    async fn handle_request(
+        &self,
+        rqctx_raw: RequestContext,
+    ) -> HttpHandlerResult {
         /*
          * This is where the magic happens: in the code below, `funcparams` has
          * type `FuncParams`, which is a tuple type describing the extractor
@@ -401,7 +412,8 @@ where
  * Public interfaces
  */
 
-impl<HandlerType, FuncParams, ResponseType> HttpRouteHandler<HandlerType, FuncParams, ResponseType>
+impl<HandlerType, FuncParams, ResponseType>
+    HttpRouteHandler<HandlerType, FuncParams, ResponseType>
 where
     HandlerType: HttpHandlerFunc<FuncParams, ResponseType>,
     FuncParams: Extractor + 'static,
@@ -421,7 +433,10 @@ where
      * signatures, return a RouteHandler that can be used to respond to HTTP
      * requests using this function.
      */
-    pub fn new_with_name(handler: HandlerType, label: &str) -> Box<dyn RouteHandler> {
+    pub fn new_with_name(
+        handler: HandlerType,
+        label: &str,
+    ) -> Box<dyn RouteHandler> {
         Box::new(HttpRouteHandler {
             label: label.to_string(),
             handler,
@@ -493,7 +508,9 @@ impl<QueryType> Extractor for Query<QueryType>
 where
     QueryType: ExtractedParameter + Send + Sync + 'static,
 {
-    async fn from_request(rqctx: Arc<RequestContext>) -> Result<Query<QueryType>, HttpError> {
+    async fn from_request(
+        rqctx: Arc<RequestContext>,
+    ) -> Result<Query<QueryType>, HttpError> {
         let request = rqctx.request.lock().await;
         http_request_load_query(&request)
     }
@@ -536,7 +553,9 @@ impl<PathType> Extractor for Path<PathType>
 where
     PathType: ExtractedParameter + Send + Sync + 'static,
 {
-    async fn from_request(rqctx: Arc<RequestContext>) -> Result<Path<PathType>, HttpError> {
+    async fn from_request(
+        rqctx: Arc<RequestContext>,
+    ) -> Result<Path<PathType>, HttpError> {
         let params: PathType = http_extract_path_params(&rqctx.path_variables)?;
         Ok(Path { inner: params })
     }
@@ -581,9 +600,13 @@ where
 {
     let server = &rqctx.server;
     let mut request = rqctx.request.lock().await;
-    let body_bytes =
-        http_read_body(request.body_mut(), server.config.request_body_max_bytes).await?;
-    let value: Result<JsonType, serde_json::Error> = serde_json::from_slice(&body_bytes);
+    let body_bytes = http_read_body(
+        request.body_mut(),
+        server.config.request_body_max_bytes,
+    )
+    .await?;
+    let value: Result<JsonType, serde_json::Error> =
+        serde_json::from_slice(&body_bytes);
     match value {
         Ok(j) => Ok(Json { inner: j }),
         Err(e) => Err(HttpError::for_bad_request(
@@ -606,7 +629,9 @@ impl<JsonType> Extractor for Json<JsonType>
 where
     JsonType: JsonSchema + DeserializeOwned + Send + Sync + 'static,
 {
-    async fn from_request(rqctx: Arc<RequestContext>) -> Result<Json<JsonType>, HttpError> {
+    async fn from_request(
+        rqctx: Arc<RequestContext>,
+    ) -> Result<Json<JsonType>, HttpError> {
         http_request_load_json_body(rqctx).await
     }
 
@@ -675,7 +700,9 @@ impl HttpResponse for Response<Body> {
  * that we provide. We use it in particular to encode the success status code
  * and the type information of the return value.
  */
-pub trait HttpTypedResponse: Into<HttpHandlerResult> + Send + Sync + 'static {
+pub trait HttpTypedResponse:
+    Into<HttpHandlerResult> + Send + Sync + 'static
+{
     type Body: JsonSchema + Serialize;
     const STATUS_CODE: StatusCode;
 
@@ -728,8 +755,8 @@ impl<T: JsonSchema + Serialize + Send + Sync + 'static> HttpTypedResponse
     type Body = T;
     const STATUS_CODE: StatusCode = StatusCode::CREATED;
 }
-impl<T: JsonSchema + Serialize + Send + Sync + 'static> From<HttpResponseCreated<T>>
-    for HttpHandlerResult
+impl<T: JsonSchema + Serialize + Send + Sync + 'static>
+    From<HttpResponseCreated<T>> for HttpHandlerResult
 {
     fn from(response: HttpResponseCreated<T>) -> HttpHandlerResult {
         /* TODO-correctness (or polish?): add Location header */
@@ -749,8 +776,8 @@ impl<T: JsonSchema + Serialize + Send + Sync + 'static> HttpTypedResponse
     type Body = T;
     const STATUS_CODE: StatusCode = StatusCode::ACCEPTED;
 }
-impl<T: JsonSchema + Serialize + Send + Sync + 'static> From<HttpResponseAccepted<T>>
-    for HttpHandlerResult
+impl<T: JsonSchema + Serialize + Send + Sync + 'static>
+    From<HttpResponseAccepted<T>> for HttpHandlerResult
 {
     fn from(response: HttpResponseAccepted<T>) -> HttpHandlerResult {
         response.for_object(&response.0)
@@ -769,8 +796,8 @@ impl<T: JsonSchema + Serialize + Send + Sync + 'static> HttpTypedResponse
     type Body = T;
     const STATUS_CODE: StatusCode = StatusCode::OK;
 }
-impl<T: JsonSchema + Serialize + Send + Sync + 'static> From<HttpResponseOkObject<T>>
-    for HttpHandlerResult
+impl<T: JsonSchema + Serialize + Send + Sync + 'static>
+    From<HttpResponseOkObject<T>> for HttpHandlerResult
 {
     fn from(response: HttpResponseOkObject<T>) -> HttpHandlerResult {
         response.for_object(&response.0)
@@ -785,15 +812,17 @@ impl<T: JsonSchema + Serialize + Send + Sync + 'static> From<HttpResponseOkObjec
  * size and the number of results that we're returning here, plus the marker.
  * TODO-cleanup move/copy the type aliases from src/api_model.rs?
  */
-pub struct HttpResponseOkObjectList<T: Serialize + Send + Sync + 'static>(pub Vec<T>);
+pub struct HttpResponseOkObjectList<T: Serialize + Send + Sync + 'static>(
+    pub Vec<T>,
+);
 impl<T: JsonSchema + Serialize + Send + Sync + 'static> HttpTypedResponse
     for HttpResponseOkObjectList<T>
 {
     type Body = T;
     const STATUS_CODE: StatusCode = StatusCode::OK;
 }
-impl<T: JsonSchema + Serialize + Send + Sync + 'static> From<HttpResponseOkObjectList<T>>
-    for HttpHandlerResult
+impl<T: JsonSchema + Serialize + Send + Sync + 'static>
+    From<HttpResponseOkObjectList<T>> for HttpHandlerResult
 {
     fn from(list_wrap: HttpResponseOkObjectList<T>) -> HttpHandlerResult {
         let list = list_wrap.0;
@@ -854,7 +883,9 @@ impl From<HttpResponseUpdatedNoContent> for HttpHandlerResult {
  * the objects fails to be serialized.  Otherwise, one bad database record (for
  * example) could cause us to be unable to list a whole class of items.
  */
-fn serialize_json_stream_element<T: Serialize>(object: &T) -> Result<Bytes, HttpError> {
+fn serialize_json_stream_element<T: Serialize>(
+    object: &T,
+) -> Result<Bytes, HttpError> {
     let mut object_json_bytes = serde_json::to_vec(object)?;
     object_json_bytes.push(b'\n');
     Ok(object_json_bytes.into())

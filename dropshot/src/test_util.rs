@@ -41,7 +41,8 @@ use crate::server::HttpServer;
  * List of allowed HTTP headers in responses.  This is used to make sure we
  * don't leak headers unexpectedly.
  */
-const ALLOWED_HEADER_NAMES: [&str; 4] = ["content-length", "content-type", "date", "x-request-id"];
+const ALLOWED_HEADER_NAMES: [&str; 4] =
+    ["content-length", "content-type", "date", "x-request-id"];
 
 /**
  * ClientTestContext encapsulates several facilities associated with using an
@@ -115,8 +116,13 @@ impl ClientTestContext {
         path: &str,
         expected_status: StatusCode,
     ) -> Result<Response<Body>, HttpErrorResponseBody> {
-        self.make_request_with_body(method, path, Body::empty(), expected_status)
-            .await
+        self.make_request_with_body(
+            method,
+            path,
+            Body::empty(),
+            expected_status,
+        )
+        .await
     }
 
     /**
@@ -342,7 +348,10 @@ impl LogContext {
      * temporary directory) containing `test_name` and other information to make
      * the filename likely to be unique across multiple runs (e.g., process id).
      */
-    pub fn new(test_name: &str, initial_config_logging: &ConfigLogging) -> LogContext {
+    pub fn new(
+        test_name: &str,
+        initial_config_logging: &ConfigLogging,
+    ) -> LogContext {
         /*
          * See above.  If the caller requested a file path, assert that the path
          * matches our sentinel (just to improve debuggability -- otherwise
@@ -432,7 +441,8 @@ impl TestContext {
         /*
          * Set up the server itself.
          */
-        let mut server = HttpServer::new(&config_dropshot, api, private, &log).unwrap();
+        let mut server =
+            HttpServer::new(&config_dropshot, api, private, &log).unwrap();
         let server_task = server.run();
 
         let server_addr = server.local_addr();
@@ -469,7 +479,9 @@ impl TestContext {
  * asynchronously read the body of the response and parse it accordingly,
  * returning a vector of T.
  */
-pub async fn read_ndjson<T: DeserializeOwned>(response: &mut Response<Body>) -> Vec<T> {
+pub async fn read_ndjson<T: DeserializeOwned>(
+    response: &mut Response<Body>,
+) -> Vec<T> {
     let headers = response.headers();
     assert_eq!(
         crate::CONTENT_TYPE_NDJSON,
@@ -480,8 +492,8 @@ pub async fn read_ndjson<T: DeserializeOwned>(response: &mut Response<Body>) -> 
     let body_bytes = to_bytes(response.body_mut())
         .await
         .expect("error reading body");
-    let body_string =
-        String::from_utf8(body_bytes.as_ref().into()).expect("response contained non-UTF-8 bytes");
+    let body_string = String::from_utf8(body_bytes.as_ref().into())
+        .expect("response contained non-UTF-8 bytes");
 
     /*
      * TODO-cleanup: Consider using serde_json::StreamDeserializer or maybe
@@ -493,7 +505,8 @@ pub async fn read_ndjson<T: DeserializeOwned>(response: &mut Response<Body>) -> 
         .split('\n')
         .filter(|line| !line.is_empty())
         .map(|line| {
-            serde_json::from_str(line).expect("failed to parse server body as expected type")
+            serde_json::from_str(line)
+                .expect("failed to parse server body as expected type")
         })
         .collect::<Vec<T>>()
 }
@@ -503,7 +516,9 @@ pub async fn read_ndjson<T: DeserializeOwned>(response: &mut Response<Body>) -> 
  * be parseable via Serde as type T, asynchronously read the body of the
  * response and parse it, returning an instance of T.
  */
-pub async fn read_json<T: DeserializeOwned>(response: &mut Response<Body>) -> T {
+pub async fn read_json<T: DeserializeOwned>(
+    response: &mut Response<Body>,
+) -> T {
     let headers = response.headers();
     assert_eq!(
         crate::CONTENT_TYPE_JSON,
@@ -526,15 +541,24 @@ pub async fn read_string(response: &mut Response<Body>) -> String {
     let body_bytes = to_bytes(response.body_mut())
         .await
         .expect("error reading body");
-    String::from_utf8(body_bytes.as_ref().into()).expect("response contained non-UTF-8 bytes")
+    String::from_utf8(body_bytes.as_ref().into())
+        .expect("response contained non-UTF-8 bytes")
 }
 
 /**
  * Fetches a single resource from the API.
  */
-pub async fn object_get<T: DeserializeOwned>(client: &ClientTestContext, object_url: &str) -> T {
+pub async fn object_get<T: DeserializeOwned>(
+    client: &ClientTestContext,
+    object_url: &str,
+) -> T {
     let mut response = client
-        .make_request_with_body(Method::GET, &object_url, "".into(), StatusCode::OK)
+        .make_request_with_body(
+            Method::GET,
+            &object_url,
+            "".into(),
+            StatusCode::OK,
+        )
         .await
         .unwrap();
     read_json::<T>(&mut response).await
@@ -548,7 +572,12 @@ pub async fn objects_list<T: DeserializeOwned>(
     list_url: &str,
 ) -> Vec<T> {
     let mut response = client
-        .make_request_with_body(Method::GET, &list_url, "".into(), StatusCode::OK)
+        .make_request_with_body(
+            Method::GET,
+            &list_url,
+            "".into(),
+            StatusCode::OK,
+        )
         .await
         .unwrap();
     read_ndjson::<T>(&mut response).await
@@ -657,8 +686,10 @@ pub struct BunyanLogRecordSpec {
  * corresponding values in `expected`.  Fields that are `None` in `expected`
  * will not be checked.
  */
-pub fn verify_bunyan_records<'a, 'b, I>(iter: I, expected: &'a BunyanLogRecordSpec)
-where
+pub fn verify_bunyan_records<'a, 'b, I>(
+    iter: I,
+    expected: &'a BunyanLogRecordSpec,
+) where
     I: Iterator<Item = &'b BunyanLogRecord>,
 {
     for record in iter {
@@ -718,7 +749,8 @@ mod test {
     use chrono::Utc;
 
     fn make_dummy_record() -> BunyanLogRecord {
-        let t1: DateTime<Utc> = DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
+        let t1: DateTime<Utc> =
+            DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
         BunyanLogRecord {
             time: t1.into(),
             name: "n1".to_string(),
@@ -734,7 +766,8 @@ mod test {
      */
     #[test]
     fn test_bunyan_easy_cases() {
-        let t1: DateTime<Utc> = DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
+        let t1: DateTime<Utc> =
+            DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
         let r1 = make_dummy_record();
         let r2 = BunyanLogRecord {
             time: t1.into(),
@@ -915,8 +948,10 @@ mod test {
      */
     #[test]
     fn test_bunyan_seq_easy_cases() {
-        let t1: DateTime<Utc> = DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
-        let t2: DateTime<Utc> = DateTime::parse_from_rfc3339(T2_STR).unwrap().into();
+        let t1: DateTime<Utc> =
+            DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
+        let t2: DateTime<Utc> =
+            DateTime::parse_from_rfc3339(T2_STR).unwrap().into();
         let v0: Vec<BunyanLogRecord> = vec![];
         let v1: Vec<BunyanLogRecord> = vec![BunyanLogRecord {
             time: t1.into(),
@@ -965,8 +1000,10 @@ mod test {
     #[test]
     #[should_panic(expected = "assertion failed: should_be_before")]
     fn test_bunyan_seq_bounds_bad() {
-        let t1: DateTime<Utc> = DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
-        let t2: DateTime<Utc> = DateTime::parse_from_rfc3339(T2_STR).unwrap().into();
+        let t1: DateTime<Utc> =
+            DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
+        let t2: DateTime<Utc> =
+            DateTime::parse_from_rfc3339(T2_STR).unwrap().into();
         let v0: Vec<BunyanLogRecord> = vec![];
         verify_bunyan_records_sequential(v0.iter(), Some(&t2), Some(&t1));
     }
@@ -977,8 +1014,10 @@ mod test {
     #[test]
     #[should_panic(expected = "assertion failed: should_be_before")]
     fn test_bunyan_seq_lower_violated() {
-        let t1: DateTime<Utc> = DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
-        let t2: DateTime<Utc> = DateTime::parse_from_rfc3339(T2_STR).unwrap().into();
+        let t1: DateTime<Utc> =
+            DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
+        let t2: DateTime<Utc> =
+            DateTime::parse_from_rfc3339(T2_STR).unwrap().into();
         let v1: Vec<BunyanLogRecord> = vec![BunyanLogRecord {
             time: t1.into(),
             name: "dummy_name".to_string(),
@@ -996,8 +1035,10 @@ mod test {
     #[test]
     #[should_panic(expected = "assertion failed: should_be_before")]
     fn test_bunyan_seq_upper_violated() {
-        let t1: DateTime<Utc> = DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
-        let t2: DateTime<Utc> = DateTime::parse_from_rfc3339(T2_STR).unwrap().into();
+        let t1: DateTime<Utc> =
+            DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
+        let t2: DateTime<Utc> =
+            DateTime::parse_from_rfc3339(T2_STR).unwrap().into();
         let v1: Vec<BunyanLogRecord> = vec![BunyanLogRecord {
             time: t2.into(),
             name: "dummy_name".to_string(),
@@ -1015,8 +1056,10 @@ mod test {
     #[test]
     #[should_panic(expected = "assertion failed: should_be_before")]
     fn test_bunyan_seq_bad_order() {
-        let t1: DateTime<Utc> = DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
-        let t2: DateTime<Utc> = DateTime::parse_from_rfc3339(T2_STR).unwrap().into();
+        let t1: DateTime<Utc> =
+            DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
+        let t2: DateTime<Utc> =
+            DateTime::parse_from_rfc3339(T2_STR).unwrap().into();
         let v2: Vec<BunyanLogRecord> = vec![
             BunyanLogRecord {
                 time: t2.into(),

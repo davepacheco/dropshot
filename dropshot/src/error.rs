@@ -129,7 +129,10 @@ impl From<HyperError> for HttpError {
          * TODO-correctness dig deeper into the various cases to make sure this
          * is a valid way to represent it.
          */
-        HttpError::for_bad_request(None, format!("error processing request: {}", error))
+        HttpError::for_bad_request(
+            None,
+            format!("error processing request: {}", error),
+        )
     }
 }
 
@@ -139,7 +142,10 @@ impl From<http::Error> for HttpError {
          * TODO-correctness dig deeper into the various cases to make sure this
          * is a valid way to represent it.
          */
-        HttpError::for_bad_request(None, format!("error processing request: {}", error))
+        HttpError::for_bad_request(
+            None,
+            format!("error processing request: {}", error),
+        )
     }
 }
 
@@ -173,7 +179,10 @@ impl HttpError {
         HttpError {
             status_code,
             error_code: Some(String::from("Internal")),
-            external_message: status_code.canonical_reason().unwrap().to_string(),
+            external_message: status_code
+                .canonical_reason()
+                .unwrap()
+                .to_string(),
             internal_message,
         }
     }
@@ -182,12 +191,18 @@ impl HttpError {
      * Generates an `HttpError` for a 503 "Service Unavailable" error with the
      * given `internal_message` for the internal message.
      */
-    pub fn for_unavail(error_code: Option<String>, internal_message: String) -> Self {
+    pub fn for_unavail(
+        error_code: Option<String>,
+        internal_message: String,
+    ) -> Self {
         let status_code = http::StatusCode::SERVICE_UNAVAILABLE;
         HttpError {
             status_code,
             error_code,
-            external_message: status_code.canonical_reason().unwrap().to_string(),
+            external_message: status_code
+                .canonical_reason()
+                .unwrap()
+                .to_string(),
             internal_message,
         }
     }
@@ -197,8 +212,15 @@ impl HttpError {
      * both the internal and external message.  This is a convenience wrapper
      * around [`HttpError::for_client_error`].
      */
-    pub fn for_bad_request(error_code: Option<String>, message: String) -> Self {
-        HttpError::for_client_error(error_code, http::StatusCode::BAD_REQUEST, message)
+    pub fn for_bad_request(
+        error_code: Option<String>,
+        message: String,
+    ) -> Self {
+        HttpError::for_client_error(
+            error_code,
+            http::StatusCode::BAD_REQUEST,
+            message,
+        )
     }
 
     /**
@@ -207,7 +229,10 @@ impl HttpError {
      * for this status code (e.g., the message for status code 404 is "Not
      * Found").
      */
-    pub fn for_status(error_code: Option<String>, status_code: http::StatusCode) -> Self {
+    pub fn for_status(
+        error_code: Option<String>,
+        status_code: http::StatusCode,
+    ) -> Self {
         /* TODO-polish This should probably be our own message. */
         let message = status_code.canonical_reason().unwrap().to_string();
         HttpError::for_client_error(error_code, status_code, message)
@@ -218,9 +243,13 @@ impl HttpError {
      * internal message `internal_message`.  The external message will be "Not
      * Found" (i.e., the standard label for status code 404).
      */
-    pub fn for_not_found(error_code: Option<String>, internal_message: String) -> Self {
+    pub fn for_not_found(
+        error_code: Option<String>,
+        internal_message: String,
+    ) -> Self {
         let status_code = http::StatusCode::NOT_FOUND;
-        let external_message = status_code.canonical_reason().unwrap().to_string();
+        let external_message =
+            status_code.canonical_reason().unwrap().to_string();
         HttpError {
             status_code,
             error_code,
@@ -233,7 +262,10 @@ impl HttpError {
      * Generates an HTTP response for the given `HttpError`, using `request_id`
      * for the response's request id.
      */
-    pub fn into_response(self, request_id: &str) -> hyper::Response<hyper::Body> {
+    pub fn into_response(
+        self,
+        request_id: &str,
+    ) -> hyper::Response<hyper::Body> {
         /*
          * TODO-hardening: consider handling the operational errors that the
          * Serde serialization fails or the response construction fails.  In

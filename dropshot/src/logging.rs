@@ -75,11 +75,15 @@ impl ConfigLogging {
     /**
      * Create a root logger based on the requested configuration.
      */
-    pub fn to_logger<S: AsRef<str>>(&self, log_name: S) -> Result<Logger, io::Error> {
+    pub fn to_logger<S: AsRef<str>>(
+        &self,
+        log_name: S,
+    ) -> Result<Logger, io::Error> {
         match self {
             ConfigLogging::StderrTerminal { level } => {
                 let decorator = slog_term::TermDecorator::new().build();
-                let drain = slog_term::FullFormat::new(decorator).build().fuse();
+                let drain =
+                    slog_term::FullFormat::new(decorator).build().fuse();
                 Ok(async_root_logger(level, drain))
             }
 
@@ -194,7 +198,10 @@ mod test {
     /**
      * Load a configuration and create a logger from it.
      */
-    fn read_config_and_create_logger(label: &str, contents: &str) -> Result<Logger, io::Error> {
+    fn read_config_and_create_logger(
+        label: &str,
+        contents: &str,
+    ) -> Result<Logger, io::Error> {
         let config = read_config::<ConfigLogging>(label, contents).unwrap();
         let result = config.to_logger("test-logger");
         if let Err(ref error) = result {
@@ -269,7 +276,8 @@ mod test {
             mode = "stderr-terminal"
             level = "warn"
         "##;
-        let config = read_config::<ConfigLogging>("stderr-terminal", config).unwrap();
+        let config =
+            read_config::<ConfigLogging>("stderr-terminal", config).unwrap();
         config.to_logger("test-logger").unwrap();
     }
 
@@ -283,9 +291,10 @@ mod test {
             mode = "file"
             level = "warn"
             "##;
-        let error = read_config::<ConfigLogging>("bad_file_no_file", bad_config)
-            .unwrap_err()
-            .to_string();
+        let error =
+            read_config::<ConfigLogging>("bad_file_no_file", bad_config)
+                .unwrap_err()
+                .to_string();
         assert_eq!(error, "missing field `path`");
     }
 
@@ -295,9 +304,10 @@ mod test {
             mode = "file"
             path = "nonexistent"
             "##;
-        let error = read_config::<ConfigLogging>("bad_file_no_level", bad_config)
-            .unwrap_err()
-            .to_string();
+        let error =
+            read_config::<ConfigLogging>("bad_file_no_level", bad_config)
+                .unwrap_err()
+                .to_string();
         assert_eq!(error, "missing field `level`");
     }
 
@@ -403,7 +413,8 @@ mod test {
         fs::create_dir(&path).unwrap();
 
         // Windows paths need to have \ turned into \\
-        let escaped_path = path.display().to_string().escape_default().to_string();
+        let escaped_path =
+            path.display().to_string().escape_default().to_string();
 
         let bad_config = format!(
             r#"
@@ -415,8 +426,11 @@ mod test {
             escaped_path
         );
 
-        let error =
-            read_config_and_create_logger("bad_file_bad_path_type", &bad_config).unwrap_err();
+        let error = read_config_and_create_logger(
+            "bad_file_bad_path_type",
+            &bad_config,
+        )
+        .unwrap_err();
 
         if cfg!(windows) {
             assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
@@ -433,7 +447,8 @@ mod test {
         fs::write(&logpath, "").expect("writing empty file");
 
         // Windows paths need to have \ turned into \\
-        let escaped_path = logpath.display().to_string().escape_default().to_string();
+        let escaped_path =
+            logpath.display().to_string().escape_default().to_string();
 
         let bad_config = format!(
             r#"
@@ -445,8 +460,11 @@ mod test {
             escaped_path
         );
 
-        let error = read_config_and_create_logger("bad_file_bad_path_exists_fail", &bad_config)
-            .unwrap_err();
+        let error = read_config_and_create_logger(
+            "bad_file_bad_path_exists_fail",
+            &bad_config,
+        )
+        .unwrap_err();
 
         assert_eq!(error.kind(), std::io::ErrorKind::AlreadyExists);
     }
@@ -464,7 +482,8 @@ mod test {
         let time_before = chrono::offset::Utc::now();
 
         // Windows paths need to have \ turned into \\
-        let escaped_path = logpath.display().to_string().escape_default().to_string();
+        let escaped_path =
+            logpath.display().to_string().escape_default().to_string();
 
         /* The first attempt should succeed.  The log file doesn't exist yet. */
         let config = format!(
@@ -517,7 +536,11 @@ mod test {
                 pid: Some(std::process::id()),
             },
         );
-        verify_bunyan_records_sequential(log_records.iter(), Some(&time_before), Some(&time_after));
+        verify_bunyan_records_sequential(
+            log_records.iter(),
+            Some(&time_before),
+            Some(&time_after),
+        );
 
         assert_eq!(log_records.len(), 3);
         assert_eq!(log_records[0].msg, "message1_warn");
@@ -558,7 +581,11 @@ mod test {
                 pid: Some(std::process::id()),
             },
         );
-        verify_bunyan_records_sequential(log_records.iter(), Some(&time_before), Some(&time_after));
+        verify_bunyan_records_sequential(
+            log_records.iter(),
+            Some(&time_before),
+            Some(&time_after),
+        );
         assert_eq!(log_records.len(), 3);
         assert_eq!(log_records[0].msg, "message3_debug");
         assert_eq!(log_records[1].msg, "message3_warn");

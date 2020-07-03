@@ -64,7 +64,9 @@ pub struct ServerConfig {
  */
 pub struct HttpServer {
     app_state: Arc<DropshotState>,
-    server_future: Option<Pin<Box<dyn Future<Output = Result<(), hyper::error::Error>> + Send>>>,
+    server_future: Option<
+        Pin<Box<dyn Future<Output = Result<(), hyper::error::Error>> + Send>>,
+    >,
     local_addr: SocketAddr,
     close_channel: Option<tokio::sync::oneshot::Sender<()>>,
 }
@@ -81,7 +83,8 @@ impl HttpServer {
          * to send the close signal because nothing else can cause the server to
          * exit.
          */
-        let channel = self.close_channel.take().expect("already closed somehow");
+        let channel =
+            self.close_channel.take().expect("already closed somehow");
         channel.send(()).expect("failed to send close signal");
     }
 
@@ -89,7 +92,9 @@ impl HttpServer {
      * TODO-cleanup is it more accurate to call this start() and say it returns
      * a Future that resolves when the server is finished?
      */
-    pub fn run(&mut self) -> tokio::task::JoinHandle<Result<(), hyper::error::Error>> {
+    pub fn run(
+        &mut self,
+    ) -> tokio::task::JoinHandle<Result<(), hyper::error::Error>> {
         let future = self
             .server_future
             .take()
@@ -149,8 +154,9 @@ impl HttpServer {
 
         let (tx, rx) = tokio::sync::oneshot::channel::<()>();
         let graceful = server.with_graceful_shutdown(async move {
-            rx.await
-                .expect("dropshot server shutting down without invoking close()");
+            rx.await.expect(
+                "dropshot server shutting down without invoking close()",
+            );
             info!(log_close, "received request to begin graceful shutdown");
         });
 
@@ -322,9 +328,14 @@ impl Service<&AddrStream> for ServerConnectionHandler {
      */
     type Response = ServerRequestHandler;
     type Error = GenericError;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+    type Future = Pin<
+        Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>,
+    >;
 
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(
+        &mut self,
+        _cx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
         // TODO is this right?
         Poll::Ready(Ok(()))
     }
@@ -372,9 +383,14 @@ impl ServerRequestHandler {
 impl Service<Request<Body>> for ServerRequestHandler {
     type Response = Response<Body>;
     type Error = GenericError;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+    type Future = Pin<
+        Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>,
+    >;
 
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(
+        &mut self,
+        _cx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
         // TODO is this right?
         Poll::Ready(Ok(()))
     }
