@@ -24,7 +24,7 @@
  *   example, the list operations should all look the same using the same names
  *   for, say, the "limit" parameter.  But there's nothing to enforce that.
  * - It would be really nice if Dropshot could implement conditional requests.
- *   This feels possible if consumers could tell Dropshot how to get the Etag of
+ *   This feels possible if consumers could tell Dropshot how to get the ETag of
  *   a resource.  But this has a huge downside -- see below.
  * - It would be really nice if the consumer could implement "update" once and
  *   Dropshot could use that to support both PUT (replace) and PATCH (update).
@@ -37,7 +37,7 @@
  * - a function to create a client view of a Project
  * - a function to look up a Project by name
  * - a function to look up a Project by id
- * 
+ *
  * This allows Dropshot to implement GET by looking up a project and converting
  * it to its view.  We could add:
  *
@@ -126,33 +126,38 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::sync::Arc;
 
-type HttpResult<T> = Result<T, HttpError>;
+pub type HttpResult<T> = Result<T, HttpError>;
 
-/** an HTTP Etag (typically a string identifying the content of a resource) */
-pub enum Etag {
+/** an HTTP ETag (typically a string identifying the content of a resource) */
+/* TODO-cleanup should split out for input/output */
+/*
+ * TODO even better would be to let consumers provide their own struct that we
+ * will checksum or the like so they don't all have to parse the string.
+ */
+pub enum ETag {
     /** matches all etags */
     Any,
     /** matches a specific etag */
-    EtagValue(String),
+    ETagValue(String),
 }
 
 /** describes preconditions for the request */
 pub enum Condition {
     /** execute only if the resource currently matches the etag */
-    IfMatchEtag(Etag),
+    IfMatchETag(ETag),
     /** execute only if the resource currently doesn't match the etag */
-    IfNotMatchEtag(Etag),
+    IfNotMatchETag(ETag),
 }
 
 /**
  * Top-level trait for all "high level" resources.
  */
-pub trait Resource {
+pub trait Resource: Sized {
     type View: Serialize;
     /** Returns the client view of a resource. */
     fn as_view(&self) -> Self::View;
     /** Returns the ETag for a resource */
-    fn etag(&self) -> Etag;
+    fn etag(&self) -> ETag;
 }
 
 /**
@@ -164,7 +169,7 @@ pub trait Create: Resource {
     fn create(
         rqctx: Arc<RequestContext>,
         params: Self::CreateParams,
-    ) -> HttpResult<Self::View>;
+    ) -> HttpResult<Self>;
 }
 
 /**
@@ -175,7 +180,7 @@ pub trait Lookup<ByKey>: Resource
 where
     ByKey: DeserializeOwned,
 {
-    fn lookup(rqctx: Arc<RequestContext>, key: ByKey) -> HttpResult<Self::View>;
+    fn lookup(rqctx: Arc<RequestContext>, key: ByKey) -> HttpResult<Self>;
 }
 
 #[derive(Deserialize, Serialize)]
@@ -187,7 +192,7 @@ pub enum PaginationOrder {
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename = "lowercase")]
-pub enum MarkerVersion {
+enum MarkerVersion {
     V1,
 }
 
@@ -216,23 +221,26 @@ where
     fn list(
         rqctx: Arc<RequestContext>,
         pag_params: PaginationParams<ByKey>,
-    ) -> HttpResult<Vec<ByKey>>;
+    ) -> HttpResult<Vec<Self>>;
 }
 
 /**
  * Implement this to support DELETE that replaces an entire object.
  */
-pub trait Delete<ByKey>: Resource
+pub trait DeleteUnconditional<ByKey>: Resource
 where
     ByKey: DeserializeOwned,
 {
-    fn delete(rqctx: Arc<RequestContext>, key: ByKey) -> HttpResult<()>;
+    fn delete_unconditional(
+        rqctx: Arc<RequestContext>,
+        key: ByKey,
+    ) -> HttpResult<()>;
 }
 
 /**
  * Implement this to support PUT that replaces an entire object.
  */
-pub trait UpdateReplace<ByKey>: Resource
+pub trait UpdateReplaceUnconditional<ByKey>: Resource
 where
     ByKey: DeserializeOwned,
 {
@@ -242,25 +250,7 @@ where
         rqctx: Arc<RequestContext>,
         key: ByKey,
         params: Self::UpdateReplaceParams,
-    ) -> HttpResult<Self::View>;
-}
-
-/**
- * Implement this to support PATCH that updates an object.
- * XXX Need to figure out the signature of this.  Would be nice if everything
- * didn't have to reimplement it from scratch.
- */
-pub trait UpdatePatch<ByKey>: Resource
-where
-    ByKey: DeserializeOwned,
-{
-    type UpdatePatchParams: DeserializeOwned;
-
-    fn update_patch(
-        rqctx: Arc<RequestContext>,
-        key: ByKey,
-        params: Self::UpdatePatchParams
-    ) -> HttpResult<Self::View>;
+    ) -> HttpResult<Self>;
 }
 
 pub trait DeleteConditional<ByKey>: Resource
