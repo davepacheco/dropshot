@@ -94,9 +94,9 @@ impl ExampleContext {
      * functions), return our application-specific context.
      */
     pub fn from_rqctx(rqctx: &Arc<RequestContext>) -> Arc<ExampleContext> {
-        let ctx: Arc<dyn Any + Send + Sync + 'static> =
-            Arc::clone(&rqctx.server.private);
-        ctx.downcast::<ExampleContext>().expect("wrong type for private data")
+        let ctx: Arc<dyn Any + Send + Sync + 'static> = Arc::clone(&rqctx.server.private);
+        ctx.downcast::<ExampleContext>()
+            .expect("wrong type for private data")
     }
 }
 
@@ -152,7 +152,9 @@ async fn example_api_put_counter(
             format!("do not like the number {}", updated_value.counter),
         ))
     } else {
-        api_context.counter.store(updated_value.counter, Ordering::SeqCst);
+        api_context
+            .counter
+            .store(updated_value.counter, Ordering::SeqCst);
         Ok(HttpResponseUpdatedNoContent())
     }
 }

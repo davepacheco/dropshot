@@ -41,8 +41,7 @@ use crate::server::HttpServer;
  * List of allowed HTTP headers in responses.  This is used to make sure we
  * don't leak headers unexpectedly.
  */
-const ALLOWED_HEADER_NAMES: [&str; 4] =
-    ["content-length", "content-type", "date", "x-request-id"];
+const ALLOWED_HEADER_NAMES: [&str; 4] = ["content-length", "content-type", "date", "x-request-id"];
 
 /**
  * ClientTestContext encapsulates several facilities associated with using an
@@ -106,7 +105,8 @@ impl ClientTestContext {
             Some(input) => serde_json::to_string(&input).unwrap().into(),
         };
 
-        self.make_request_with_body(method, path, body, expected_status).await
+        self.make_request_with_body(method, path, body, expected_status)
+            .await
     }
 
     pub async fn make_request_no_body(
@@ -115,13 +115,8 @@ impl ClientTestContext {
         path: &str,
         expected_status: StatusCode,
     ) -> Result<Response<Body>, HttpErrorResponseBody> {
-        self.make_request_with_body(
-            method,
-            path,
-            Body::empty(),
-            expected_status,
-        )
-        .await
+        self.make_request_with_body(method, path, Body::empty(), expected_status)
+            .await
     }
 
     /**
@@ -347,10 +342,7 @@ impl LogContext {
      * temporary directory) containing `test_name` and other information to make
      * the filename likely to be unique across multiple runs (e.g., process id).
      */
-    pub fn new(
-        test_name: &str,
-        initial_config_logging: &ConfigLogging,
-    ) -> LogContext {
+    pub fn new(test_name: &str, initial_config_logging: &ConfigLogging) -> LogContext {
         /*
          * See above.  If the caller requested a file path, assert that the path
          * matches our sentinel (just to improve debuggability -- otherwise
@@ -375,20 +367,20 @@ impl LogContext {
                 let new_path = log_file_for_test(test_name);
                 let new_path_str = new_path.as_path().display().to_string();
                 eprintln!("log file: {:?}", new_path_str);
-                (Some(new_path), ConfigLogging::File {
-                    level: level.clone(),
-                    path: new_path_str,
-                    if_exists: if_exists.clone(),
-                })
+                (
+                    Some(new_path),
+                    ConfigLogging::File {
+                        level: level.clone(),
+                        path: new_path_str,
+                        if_exists: if_exists.clone(),
+                    },
+                )
             }
             other_config => (None, other_config.clone()),
         };
 
         let log = log_config.to_logger(test_name).unwrap();
-        LogContext {
-            log,
-            log_path,
-        }
+        LogContext { log, log_path }
     }
 
     /**
@@ -440,8 +432,7 @@ impl TestContext {
         /*
          * Set up the server itself.
          */
-        let mut server =
-            HttpServer::new(&config_dropshot, api, private, &log).unwrap();
+        let mut server = HttpServer::new(&config_dropshot, api, private, &log).unwrap();
         let server_task = server.run();
 
         let server_addr = server.local_addr();
@@ -478,18 +469,19 @@ impl TestContext {
  * asynchronously read the body of the response and parse it accordingly,
  * returning a vector of T.
  */
-pub async fn read_ndjson<T: DeserializeOwned>(
-    response: &mut Response<Body>,
-) -> Vec<T> {
+pub async fn read_ndjson<T: DeserializeOwned>(response: &mut Response<Body>) -> Vec<T> {
     let headers = response.headers();
     assert_eq!(
         crate::CONTENT_TYPE_NDJSON,
-        headers.get(http::header::CONTENT_TYPE).expect("missing content-type")
+        headers
+            .get(http::header::CONTENT_TYPE)
+            .expect("missing content-type")
     );
-    let body_bytes =
-        to_bytes(response.body_mut()).await.expect("error reading body");
-    let body_string = String::from_utf8(body_bytes.as_ref().into())
-        .expect("response contained non-UTF-8 bytes");
+    let body_bytes = to_bytes(response.body_mut())
+        .await
+        .expect("error reading body");
+    let body_string =
+        String::from_utf8(body_bytes.as_ref().into()).expect("response contained non-UTF-8 bytes");
 
     /*
      * TODO-cleanup: Consider using serde_json::StreamDeserializer or maybe
@@ -501,8 +493,7 @@ pub async fn read_ndjson<T: DeserializeOwned>(
         .split('\n')
         .filter(|line| !line.is_empty())
         .map(|line| {
-            serde_json::from_str(line)
-                .expect("failed to parse server body as expected type")
+            serde_json::from_str(line).expect("failed to parse server body as expected type")
         })
         .collect::<Vec<T>>()
 }
@@ -512,16 +503,17 @@ pub async fn read_ndjson<T: DeserializeOwned>(
  * be parseable via Serde as type T, asynchronously read the body of the
  * response and parse it, returning an instance of T.
  */
-pub async fn read_json<T: DeserializeOwned>(
-    response: &mut Response<Body>,
-) -> T {
+pub async fn read_json<T: DeserializeOwned>(response: &mut Response<Body>) -> T {
     let headers = response.headers();
     assert_eq!(
         crate::CONTENT_TYPE_JSON,
-        headers.get(http::header::CONTENT_TYPE).expect("missing content-type")
+        headers
+            .get(http::header::CONTENT_TYPE)
+            .expect("missing content-type")
     );
-    let body_bytes =
-        to_bytes(response.body_mut()).await.expect("error reading body");
+    let body_bytes = to_bytes(response.body_mut())
+        .await
+        .expect("error reading body");
     serde_json::from_slice(body_bytes.as_ref())
         .expect("failed to parse server body as expected type")
 }
@@ -531,26 +523,18 @@ pub async fn read_json<T: DeserializeOwned>(
  * asynchronously read the body.
  */
 pub async fn read_string(response: &mut Response<Body>) -> String {
-    let body_bytes =
-        to_bytes(response.body_mut()).await.expect("error reading body");
-    String::from_utf8(body_bytes.as_ref().into())
-        .expect("response contained non-UTF-8 bytes")
+    let body_bytes = to_bytes(response.body_mut())
+        .await
+        .expect("error reading body");
+    String::from_utf8(body_bytes.as_ref().into()).expect("response contained non-UTF-8 bytes")
 }
 
 /**
  * Fetches a single resource from the API.
  */
-pub async fn object_get<T: DeserializeOwned>(
-    client: &ClientTestContext,
-    object_url: &str,
-) -> T {
+pub async fn object_get<T: DeserializeOwned>(client: &ClientTestContext, object_url: &str) -> T {
     let mut response = client
-        .make_request_with_body(
-            Method::GET,
-            &object_url,
-            "".into(),
-            StatusCode::OK,
-        )
+        .make_request_with_body(Method::GET, &object_url, "".into(), StatusCode::OK)
         .await
         .unwrap();
     read_json::<T>(&mut response).await
@@ -564,12 +548,7 @@ pub async fn objects_list<T: DeserializeOwned>(
     list_url: &str,
 ) -> Vec<T> {
     let mut response = client
-        .make_request_with_body(
-            Method::GET,
-            &list_url,
-            "".into(),
-            StatusCode::OK,
-        )
+        .make_request_with_body(Method::GET, &list_url, "".into(), StatusCode::OK)
         .await
         .unwrap();
     read_ndjson::<T>(&mut response).await
@@ -604,7 +583,12 @@ static TEST_SUITE_LOGGER_ID: AtomicU32 = AtomicU32::new(0);
 pub fn log_file_for_test(test_name: &str) -> PathBuf {
     let arg0 = {
         let arg0path = std::env::args().next().unwrap();
-        Path::new(&arg0path).file_name().unwrap().to_str().unwrap().to_string()
+        Path::new(&arg0path)
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string()
     };
 
     let mut pathbuf = std::env::temp_dir();
@@ -673,10 +657,8 @@ pub struct BunyanLogRecordSpec {
  * corresponding values in `expected`.  Fields that are `None` in `expected`
  * will not be checked.
  */
-pub fn verify_bunyan_records<'a, 'b, I>(
-    iter: I,
-    expected: &'a BunyanLogRecordSpec,
-) where
+pub fn verify_bunyan_records<'a, 'b, I>(iter: I, expected: &'a BunyanLogRecordSpec)
+where
     I: Iterator<Item = &'b BunyanLogRecord>,
 {
     for record in iter {
@@ -736,8 +718,7 @@ mod test {
     use chrono::Utc;
 
     fn make_dummy_record() -> BunyanLogRecord {
-        let t1: DateTime<Utc> =
-            DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
+        let t1: DateTime<Utc> = DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
         BunyanLogRecord {
             time: t1.into(),
             name: "n1".to_string(),
@@ -753,8 +734,7 @@ mod test {
      */
     #[test]
     fn test_bunyan_easy_cases() {
-        let t1: DateTime<Utc> =
-            DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
+        let t1: DateTime<Utc> = DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
         let r1 = make_dummy_record();
         let r2 = BunyanLogRecord {
             time: t1.into(),
@@ -768,72 +748,93 @@ mod test {
         /* Test case: nothing to check. */
         let records: Vec<&BunyanLogRecord> = vec![&r1];
         let iter = records.iter().map(|x| *x);
-        verify_bunyan_records(iter, &BunyanLogRecordSpec {
-            name: None,
-            hostname: None,
-            pid: None,
-            v: None,
-        });
+        verify_bunyan_records(
+            iter,
+            &BunyanLogRecordSpec {
+                name: None,
+                hostname: None,
+                pid: None,
+                v: None,
+            },
+        );
 
         /* Test case: check name, no problem. */
         let records: Vec<&BunyanLogRecord> = vec![&r1];
         let iter = records.iter().map(|x| *x);
-        verify_bunyan_records(iter, &BunyanLogRecordSpec {
-            name: Some("n1".to_string()),
-            hostname: None,
-            pid: None,
-            v: None,
-        });
+        verify_bunyan_records(
+            iter,
+            &BunyanLogRecordSpec {
+                name: Some("n1".to_string()),
+                hostname: None,
+                pid: None,
+                v: None,
+            },
+        );
 
         /* Test case: check hostname, no problem. */
         let records: Vec<&BunyanLogRecord> = vec![&r1];
         let iter = records.iter().map(|x| *x);
-        verify_bunyan_records(iter, &BunyanLogRecordSpec {
-            name: None,
-            hostname: Some("h1".to_string()),
-            pid: None,
-            v: None,
-        });
+        verify_bunyan_records(
+            iter,
+            &BunyanLogRecordSpec {
+                name: None,
+                hostname: Some("h1".to_string()),
+                pid: None,
+                v: None,
+            },
+        );
 
         /* Test case: check pid, no problem. */
         let records: Vec<&BunyanLogRecord> = vec![&r1];
         let iter = records.iter().map(|x| *x);
-        verify_bunyan_records(iter, &BunyanLogRecordSpec {
-            name: None,
-            hostname: None,
-            pid: Some(1),
-            v: None,
-        });
+        verify_bunyan_records(
+            iter,
+            &BunyanLogRecordSpec {
+                name: None,
+                hostname: None,
+                pid: Some(1),
+                v: None,
+            },
+        );
 
         /* Test case: check hostname, no problem. */
         let records: Vec<&BunyanLogRecord> = vec![&r1];
         let iter = records.iter().map(|x| *x);
-        verify_bunyan_records(iter, &BunyanLogRecordSpec {
-            name: None,
-            hostname: None,
-            pid: None,
-            v: Some(0),
-        });
+        verify_bunyan_records(
+            iter,
+            &BunyanLogRecordSpec {
+                name: None,
+                hostname: None,
+                pid: None,
+                v: Some(0),
+            },
+        );
 
         /* Test case: check all, no problem. */
         let records: Vec<&BunyanLogRecord> = vec![&r1];
         let iter = records.iter().map(|x| *x);
-        verify_bunyan_records(iter, &BunyanLogRecordSpec {
-            name: Some("n1".to_string()),
-            hostname: Some("h1".to_string()),
-            pid: Some(1),
-            v: Some(0),
-        });
+        verify_bunyan_records(
+            iter,
+            &BunyanLogRecordSpec {
+                name: Some("n1".to_string()),
+                hostname: Some("h1".to_string()),
+                pid: Some(1),
+                v: Some(0),
+            },
+        );
 
         /* Test case: check multiple records, no problem. */
         let records: Vec<&BunyanLogRecord> = vec![&r1, &r2];
         let iter = records.iter().map(|x| *x);
-        verify_bunyan_records(iter, &BunyanLogRecordSpec {
-            name: Some("n1".to_string()),
-            hostname: None,
-            pid: Some(1),
-            v: None,
-        });
+        verify_bunyan_records(
+            iter,
+            &BunyanLogRecordSpec {
+                name: Some("n1".to_string()),
+                hostname: None,
+                pid: Some(1),
+                v: None,
+            },
+        );
     }
 
     /*
@@ -846,12 +847,15 @@ mod test {
         let r1 = make_dummy_record();
         let records: Vec<&BunyanLogRecord> = vec![&r1];
         let iter = records.iter().map(|x| *x);
-        verify_bunyan_records(iter, &BunyanLogRecordSpec {
-            name: Some("n2".to_string()),
-            hostname: None,
-            pid: None,
-            v: None,
-        });
+        verify_bunyan_records(
+            iter,
+            &BunyanLogRecordSpec {
+                name: Some("n2".to_string()),
+                hostname: None,
+                pid: None,
+                v: None,
+            },
+        );
     }
 
     #[test]
@@ -860,12 +864,15 @@ mod test {
         let r1 = make_dummy_record();
         let records: Vec<&BunyanLogRecord> = vec![&r1];
         let iter = records.iter().map(|x| *x);
-        verify_bunyan_records(iter, &BunyanLogRecordSpec {
-            name: None,
-            hostname: Some("h2".to_string()),
-            pid: None,
-            v: None,
-        });
+        verify_bunyan_records(
+            iter,
+            &BunyanLogRecordSpec {
+                name: None,
+                hostname: Some("h2".to_string()),
+                pid: None,
+                v: None,
+            },
+        );
     }
 
     #[test]
@@ -874,12 +881,15 @@ mod test {
         let r1 = make_dummy_record();
         let records: Vec<&BunyanLogRecord> = vec![&r1];
         let iter = records.iter().map(|x| *x);
-        verify_bunyan_records(iter, &BunyanLogRecordSpec {
-            name: None,
-            hostname: None,
-            pid: Some(2),
-            v: None,
-        });
+        verify_bunyan_records(
+            iter,
+            &BunyanLogRecordSpec {
+                name: None,
+                hostname: None,
+                pid: Some(2),
+                v: None,
+            },
+        );
     }
 
     #[test]
@@ -888,12 +898,15 @@ mod test {
         let r1 = make_dummy_record();
         let records: Vec<&BunyanLogRecord> = vec![&r1];
         let iter = records.iter().map(|x| *x);
-        verify_bunyan_records(iter, &BunyanLogRecordSpec {
-            name: None,
-            hostname: None,
-            pid: None,
-            v: Some(1),
-        });
+        verify_bunyan_records(
+            iter,
+            &BunyanLogRecordSpec {
+                name: None,
+                hostname: None,
+                pid: None,
+                v: Some(1),
+            },
+        );
     }
 
     /*
@@ -902,10 +915,8 @@ mod test {
      */
     #[test]
     fn test_bunyan_seq_easy_cases() {
-        let t1: DateTime<Utc> =
-            DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
-        let t2: DateTime<Utc> =
-            DateTime::parse_from_rfc3339(T2_STR).unwrap().into();
+        let t1: DateTime<Utc> = DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
+        let t2: DateTime<Utc> = DateTime::parse_from_rfc3339(T2_STR).unwrap().into();
         let v0: Vec<BunyanLogRecord> = vec![];
         let v1: Vec<BunyanLogRecord> = vec![BunyanLogRecord {
             time: t1.into(),
@@ -954,10 +965,8 @@ mod test {
     #[test]
     #[should_panic(expected = "assertion failed: should_be_before")]
     fn test_bunyan_seq_bounds_bad() {
-        let t1: DateTime<Utc> =
-            DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
-        let t2: DateTime<Utc> =
-            DateTime::parse_from_rfc3339(T2_STR).unwrap().into();
+        let t1: DateTime<Utc> = DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
+        let t2: DateTime<Utc> = DateTime::parse_from_rfc3339(T2_STR).unwrap().into();
         let v0: Vec<BunyanLogRecord> = vec![];
         verify_bunyan_records_sequential(v0.iter(), Some(&t2), Some(&t1));
     }
@@ -968,10 +977,8 @@ mod test {
     #[test]
     #[should_panic(expected = "assertion failed: should_be_before")]
     fn test_bunyan_seq_lower_violated() {
-        let t1: DateTime<Utc> =
-            DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
-        let t2: DateTime<Utc> =
-            DateTime::parse_from_rfc3339(T2_STR).unwrap().into();
+        let t1: DateTime<Utc> = DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
+        let t2: DateTime<Utc> = DateTime::parse_from_rfc3339(T2_STR).unwrap().into();
         let v1: Vec<BunyanLogRecord> = vec![BunyanLogRecord {
             time: t1.into(),
             name: "dummy_name".to_string(),
@@ -989,10 +996,8 @@ mod test {
     #[test]
     #[should_panic(expected = "assertion failed: should_be_before")]
     fn test_bunyan_seq_upper_violated() {
-        let t1: DateTime<Utc> =
-            DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
-        let t2: DateTime<Utc> =
-            DateTime::parse_from_rfc3339(T2_STR).unwrap().into();
+        let t1: DateTime<Utc> = DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
+        let t2: DateTime<Utc> = DateTime::parse_from_rfc3339(T2_STR).unwrap().into();
         let v1: Vec<BunyanLogRecord> = vec![BunyanLogRecord {
             time: t2.into(),
             name: "dummy_name".to_string(),
@@ -1010,10 +1015,8 @@ mod test {
     #[test]
     #[should_panic(expected = "assertion failed: should_be_before")]
     fn test_bunyan_seq_bad_order() {
-        let t1: DateTime<Utc> =
-            DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
-        let t2: DateTime<Utc> =
-            DateTime::parse_from_rfc3339(T2_STR).unwrap().into();
+        let t1: DateTime<Utc> = DateTime::parse_from_rfc3339(T1_STR).unwrap().into();
+        let t2: DateTime<Utc> = DateTime::parse_from_rfc3339(T2_STR).unwrap().into();
         let v2: Vec<BunyanLogRecord> = vec![
             BunyanLogRecord {
                 time: t2.into(),

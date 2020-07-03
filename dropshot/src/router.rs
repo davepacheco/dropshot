@@ -185,9 +185,9 @@ impl HttpRouter {
 
             node = match segment {
                 PathSegment::Literal(lit) => {
-                    let edges = node.edges.get_or_insert(
-                        HttpRouterEdges::Literals(BTreeMap::new()),
-                    );
+                    let edges = node
+                        .edges
+                        .get_or_insert(HttpRouterEdges::Literals(BTreeMap::new()));
                     match edges {
                         /*
                          * We do not allow both literal and variable edges from
@@ -225,11 +225,10 @@ impl HttpRouter {
                     }
                     varnames.insert(new_varname.clone());
 
-                    let edges =
-                        node.edges.get_or_insert(HttpRouterEdges::Variable(
-                            new_varname.clone(),
-                            Box::new(HttpRouterNode::new()),
-                        ));
+                    let edges = node.edges.get_or_insert(HttpRouterEdges::Variable(
+                        new_varname.clone(),
+                        Box::new(HttpRouterNode::new()),
+                    ));
                     match edges {
                         /*
                          * See the analogous check above about combining literal
@@ -304,19 +303,14 @@ impl HttpRouter {
 
             node = match &node.edges {
                 None => None,
-                Some(HttpRouterEdges::Literals(edges)) => {
-                    edges.get(&segment_string)
-                }
+                Some(HttpRouterEdges::Literals(edges)) => edges.get(&segment_string),
                 Some(HttpRouterEdges::Variable(varname, ref node)) => {
                     variables.insert(varname.clone(), segment_string);
                     Some(node)
                 }
             }
             .ok_or_else(|| {
-                HttpError::for_not_found(
-                    None,
-                    String::from("no route found (no path in router)"),
-                )
+                HttpError::for_not_found(None, String::from("no route found (no path in router)"))
             })?
         }
 
@@ -338,9 +332,7 @@ impl HttpRouter {
                 handler: &handler.handler,
                 variables,
             })
-            .ok_or_else(|| {
-                HttpError::for_status(None, StatusCode::METHOD_NOT_ALLOWED)
-            })
+            .ok_or_else(|| HttpError::for_status(None, StatusCode::METHOD_NOT_ALLOWED))
     }
 }
 
@@ -366,8 +358,7 @@ pub struct HttpRouterIter<'a> {
     method: Box<dyn Iterator<Item = (&'a String, &'a ApiEndpoint)> + 'a>,
     path: Vec<(PathSegment, Box<PathIter<'a>>)>,
 }
-type PathIter<'a> =
-    dyn Iterator<Item = (PathSegment, &'a Box<HttpRouterNode>)> + 'a;
+type PathIter<'a> = dyn Iterator<Item = (PathSegment, &'a Box<HttpRouterNode>)> + 'a;
 
 impl<'a> HttpRouterIter<'a> {
     fn new(router: &'a HttpRouter) -> Self {
@@ -392,9 +383,10 @@ impl<'a> HttpRouterIter<'a> {
                 map.iter()
                     .map(|(s, node)| (PathSegment::Literal(s.clone()), node)),
             ),
-            Some(HttpRouterEdges::Variable(ref varname, ref node)) => Box::new(
-                std::iter::once((PathSegment::Varname(varname.clone()), node)),
-            ),
+            Some(HttpRouterEdges::Variable(ref varname, ref node)) => Box::new(std::iter::once((
+                PathSegment::Varname(varname.clone()),
+                node,
+            ))),
             None => Box::new(std::iter::empty()),
         }
     }
@@ -442,10 +434,8 @@ impl<'a> Iterator for HttpRouterIter<'a> {
                                 assert!(self.method.next().is_none());
                             }
                             Some((path_component, node)) => {
-                                self.path.push((
-                                    path_component,
-                                    HttpRouterIter::iter_node(node),
-                                ));
+                                self.path
+                                    .push((path_component, HttpRouterIter::iter_node(node)));
                                 self.method = Box::new(node.methods.iter());
                             }
                         },
@@ -495,7 +485,9 @@ pub fn path_to_segments(path: &str) -> Vec<&str> {
      * much here, but it does create more work, so we'll just split it
      * ourselves.
      */
-    path.split('/').filter(|segment| !segment.is_empty()).collect::<Vec<_>>()
+    path.split('/')
+        .filter(|segment| !segment.is_empty())
+        .collect::<Vec<_>>()
 }
 
 #[cfg(test)]
@@ -513,9 +505,7 @@ mod test {
     use hyper::Response;
     use std::sync::Arc;
 
-    async fn test_handler(
-        _: Arc<RequestContext>,
-    ) -> Result<Response<Body>, HttpError> {
+    async fn test_handler(_: Arc<RequestContext>) -> Result<Response<Body>, HttpError> {
         panic!("test handler is not supposed to run");
     }
 
@@ -527,11 +517,7 @@ mod test {
         HttpRouteHandler::new_with_name(test_handler, name)
     }
 
-    fn new_endpoint(
-        handler: Box<dyn RouteHandler>,
-        method: Method,
-        path: &str,
-    ) -> ApiEndpoint {
+    fn new_endpoint(handler: Box<dyn RouteHandler>, method: Method, path: &str) -> ApiEndpoint {
         ApiEndpoint {
             operation_id: "test_handler".to_string(),
             handler: handler,
@@ -547,38 +533,24 @@ mod test {
     }
 
     #[test]
-    #[should_panic(
-        expected = "HTTP URI path segment variable name cannot be empty"
-    )]
+    #[should_panic(expected = "HTTP URI path segment variable name cannot be empty")]
     fn test_variable_name_empty() {
         let mut router = HttpRouter::new();
         router.insert(new_endpoint(new_handler(), Method::GET, "/foo/{}"));
     }
 
     #[test]
-    #[should_panic(
-        expected = "HTTP URI path segment variable missing trailing \"}\""
-    )]
+    #[should_panic(expected = "HTTP URI path segment variable missing trailing \"}\"")]
     fn test_variable_name_bad_end() {
         let mut router = HttpRouter::new();
-        router.insert(new_endpoint(
-            new_handler(),
-            Method::GET,
-            "/foo/{asdf/foo",
-        ));
+        router.insert(new_endpoint(new_handler(), Method::GET, "/foo/{asdf/foo"));
     }
 
     #[test]
-    #[should_panic(
-        expected = "HTTP URI path segment variable missing leading \"{\""
-    )]
+    #[should_panic(expected = "HTTP URI path segment variable missing leading \"{\"")]
     fn test_variable_name_bad_start() {
         let mut router = HttpRouter::new();
-        router.insert(new_endpoint(
-            new_handler(),
-            Method::GET,
-            "/foo/asdf}/foo",
-        ));
+        router.insert(new_endpoint(new_handler(), Method::GET, "/foo/asdf}/foo"));
     }
 
     #[test]
@@ -632,11 +604,7 @@ mod test {
             Method::GET,
             "/projects/{project_id}",
         ));
-        router.insert(new_endpoint(
-            new_handler(),
-            Method::GET,
-            "/projects/{id}",
-        ));
+        router.insert(new_endpoint(new_handler(), Method::GET, "/projects/{id}"));
     }
 
     #[test]
@@ -651,11 +619,7 @@ mod test {
             Method::GET,
             "/projects/default",
         ));
-        router.insert(new_endpoint(
-            new_handler(),
-            Method::GET,
-            "/projects/{id}",
-        ));
+        router.insert(new_endpoint(new_handler(), Method::GET, "/projects/{id}"));
     }
 
     #[test]
@@ -665,11 +629,7 @@ mod test {
                                path segment (variable name: \"id\")")]
     fn test_literal_after_variable() {
         let mut router = HttpRouter::new();
-        router.insert(new_endpoint(
-            new_handler(),
-            Method::GET,
-            "/projects/{id}",
-        ));
+        router.insert(new_endpoint(new_handler(), Method::GET, "/projects/{id}"));
         router.insert(new_endpoint(
             new_handler(),
             Method::GET,
@@ -690,8 +650,9 @@ mod test {
         assert_eq!(error.status_code, StatusCode::NOT_FOUND);
         let error = router.lookup_route(&Method::GET, "/foo/bar").unwrap_err();
         assert_eq!(error.status_code, StatusCode::NOT_FOUND);
-        let error =
-            router.lookup_route(&Method::GET, "//foo///bar").unwrap_err();
+        let error = router
+            .lookup_route(&Method::GET, "//foo///bar")
+            .unwrap_err();
         assert_eq!(error.status_code, StatusCode::NOT_FOUND);
 
         /*
@@ -717,8 +678,9 @@ mod test {
         assert_eq!(error.status_code, StatusCode::NOT_FOUND);
         let error = router.lookup_route(&Method::GET, "//foo").unwrap_err();
         assert_eq!(error.status_code, StatusCode::NOT_FOUND);
-        let error =
-            router.lookup_route(&Method::GET, "/foo/bar/baz").unwrap_err();
+        let error = router
+            .lookup_route(&Method::GET, "/foo/bar/baz")
+            .unwrap_err();
         assert_eq!(error.status_code, StatusCode::NOT_FOUND);
 
         let error = router.lookup_route(&Method::PUT, "/foo/bar").unwrap_err();
@@ -771,11 +733,7 @@ mod test {
          * path, whichever name we use for it.
          */
         assert!(router.lookup_route(&Method::GET, "/foo").is_err());
-        router.insert(new_endpoint(
-            new_handler_named("h3"),
-            Method::GET,
-            "/foo",
-        ));
+        router.insert(new_endpoint(new_handler_named("h3"), Method::GET, "/foo"));
         let result = router.lookup_route(&Method::PUT, "/").unwrap();
         assert_eq!(result.handler.label(), "h2");
         assert!(result.variables.is_empty());
@@ -807,18 +765,25 @@ mod test {
          * change the behavior, intentionally or otherwise.
          */
         let mut router = HttpRouter::new();
-        assert!(router.lookup_route(&Method::GET, "/not{a}variable").is_err());
+        assert!(router
+            .lookup_route(&Method::GET, "/not{a}variable")
+            .is_err());
         router.insert(new_endpoint(
             new_handler_named("h4"),
             Method::GET,
             "/not{a}variable",
         ));
-        let result =
-            router.lookup_route(&Method::GET, "/not{a}variable").unwrap();
+        let result = router
+            .lookup_route(&Method::GET, "/not{a}variable")
+            .unwrap();
         assert_eq!(result.handler.label(), "h4");
         assert!(result.variables.is_empty());
-        assert!(router.lookup_route(&Method::GET, "/not{b}variable").is_err());
-        assert!(router.lookup_route(&Method::GET, "/notnotavariable").is_err());
+        assert!(router
+            .lookup_route(&Method::GET, "/not{b}variable")
+            .is_err());
+        assert!(router
+            .lookup_route(&Method::GET, "/notnotavariable")
+            .is_err());
     }
 
     #[test]
@@ -834,22 +799,26 @@ mod test {
         ));
         assert!(router.lookup_route(&Method::GET, "/projects").is_err());
         assert!(router.lookup_route(&Method::GET, "/projects/").is_err());
-        let result =
-            router.lookup_route(&Method::GET, "/projects/p12345").unwrap();
+        let result = router
+            .lookup_route(&Method::GET, "/projects/p12345")
+            .unwrap();
         assert_eq!(result.handler.label(), "h5");
-        assert_eq!(result.variables.keys().collect::<Vec<&String>>(), vec![
-            "project_id"
-        ]);
+        assert_eq!(
+            result.variables.keys().collect::<Vec<&String>>(),
+            vec!["project_id"]
+        );
         assert_eq!(result.variables.get("project_id").unwrap(), "p12345");
         assert!(router
             .lookup_route(&Method::GET, "/projects/p12345/child")
             .is_err());
-        let result =
-            router.lookup_route(&Method::GET, "/projects/p12345/").unwrap();
+        let result = router
+            .lookup_route(&Method::GET, "/projects/p12345/")
+            .unwrap();
         assert_eq!(result.handler.label(), "h5");
         assert_eq!(result.variables.get("project_id").unwrap(), "p12345");
-        let result =
-            router.lookup_route(&Method::GET, "/projects///p12345//").unwrap();
+        let result = router
+            .lookup_route(&Method::GET, "/projects///p12345//")
+            .unwrap();
         assert_eq!(result.handler.label(), "h5");
         assert_eq!(result.variables.get("project_id").unwrap(), "p12345");
         /* Trick question! */
@@ -873,17 +842,13 @@ mod test {
              {fwrule_id}/info",
         ));
         let result = router
-            .lookup_route(
-                &Method::GET,
-                "/projects/p1/instances/i2/fwrules/fw3/info",
-            )
+            .lookup_route(&Method::GET, "/projects/p1/instances/i2/fwrules/fw3/info")
             .unwrap();
         assert_eq!(result.handler.label(), "h6");
-        assert_eq!(result.variables.keys().collect::<Vec<&String>>(), vec![
-            "fwrule_id",
-            "instance_id",
-            "project_id"
-        ]);
+        assert_eq!(
+            result.variables.keys().collect::<Vec<&String>>(),
+            vec!["fwrule_id", "instance_id", "project_id"]
+        );
         assert_eq!(result.variables.get("project_id").unwrap(), "p1");
         assert_eq!(result.variables.get("instance_id").unwrap(), "i2");
         assert_eq!(result.variables.get("fwrule_id").unwrap(), "fw3");
@@ -926,21 +891,23 @@ mod test {
     #[test]
     fn test_iter() {
         let mut router = HttpRouter::new();
-        router.insert(new_endpoint(
-            new_handler_named("root"),
-            Method::GET,
-            "/",
-        ));
+        router.insert(new_endpoint(new_handler_named("root"), Method::GET, "/"));
         router.insert(new_endpoint(
             new_handler_named("i"),
             Method::GET,
             "/projects/{project_id}/instances",
         ));
         let ret: Vec<_> = router.into_iter().map(|x| (x.0, x.1)).collect();
-        assert_eq!(ret, vec![
-            ("/".to_string(), "GET".to_string(),),
-            ("/projects/{project_id}/instances".to_string(), "GET".to_string(),),
-        ]);
+        assert_eq!(
+            ret,
+            vec![
+                ("/".to_string(), "GET".to_string(),),
+                (
+                    "/projects/{project_id}/instances".to_string(),
+                    "GET".to_string(),
+                ),
+            ]
+        );
     }
 
     #[test]
@@ -957,9 +924,12 @@ mod test {
             "/",
         ));
         let ret: Vec<_> = router.into_iter().map(|x| (x.0, x.1)).collect();
-        assert_eq!(ret, vec![
-            ("/".to_string(), "GET".to_string(),),
-            ("/".to_string(), "POST".to_string(),),
-        ]);
+        assert_eq!(
+            ret,
+            vec![
+                ("/".to_string(), "GET".to_string(),),
+                ("/".to_string(), "POST".to_string(),),
+            ]
+        );
     }
 }

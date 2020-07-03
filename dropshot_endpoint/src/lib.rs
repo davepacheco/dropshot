@@ -60,10 +60,7 @@ pub fn endpoint(
     }
 }
 
-fn do_endpoint(
-    attr: TokenStream,
-    item: TokenStream,
-) -> Result<TokenStream, Error> {
+fn do_endpoint(attr: TokenStream, item: TokenStream) -> Result<TokenStream, Error> {
     let metadata = from_tokenstream::<Metadata>(&attr)?;
 
     let method = metadata.method.as_str();
@@ -78,7 +75,11 @@ fn do_endpoint(
     let description_text_provided = extract_doc_from_attrs(&ast.attrs);
     let description_text_annotated = format!(
         "API Endpoint: {}",
-        description_text_provided.as_ref().unwrap_or(&name_str).as_str().trim()
+        description_text_provided
+            .as_ref()
+            .unwrap_or(&name_str)
+            .as_str()
+            .trim()
     );
     let description_doc_comment = quote! {
         #[doc = #description_text_annotated]
@@ -127,16 +128,14 @@ fn do_endpoint(
 
 /// Derive the implementation for dropshot::ExtractedParameter
 #[proc_macro_derive(ExtractedParameter, attributes(dropshot))]
-pub fn derive_parameter(
-    item: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
+pub fn derive_parameter(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
-    do_derive_parameter(&input).unwrap_or_else(to_compile_errors).into()
+    do_derive_parameter(&input)
+        .unwrap_or_else(to_compile_errors)
+        .into()
 }
 
-fn do_derive_parameter(
-    input: &DeriveInput,
-) -> Result<TokenStream, Vec<syn::Error>> {
+fn do_derive_parameter(input: &DeriveInput) -> Result<TokenStream, Vec<syn::Error>> {
     let ctxt = Ctxt::new();
 
     let cont = match Container::from_ast(&ctxt, input, Derive::Deserialize) {
@@ -155,10 +154,7 @@ fn do_derive_parameter(
             match &f.member {
                 syn::Member::Named(ident) => {
                     let doc = extract_doc_from_attrs(&f.original.attrs)
-                        .map_or_else(
-                            || quote! { None },
-                            |s| quote! { Some(#s.to_string()) },
-                        );
+                        .map_or_else(|| quote! { None }, |s| quote! { Some(#s.to_string()) });
                     let name = ident.to_string();
                     Some(quote! {
                         #dropshot::ApiEndpointParameter {
@@ -222,19 +218,18 @@ fn get_crate_attr(cont: &Container) -> Option<String> {
         .filter_map(|attr| {
             if let Ok(meta) = attr.parse_meta() {
                 if let syn::Meta::List(list) = meta {
-                    if list.path.is_ident(&syn::Ident::new(
-                        "dropshot",
-                        proc_macro2::Span::call_site(),
-                    )) && list.nested.len() == 1
+                    if list
+                        .path
+                        .is_ident(&syn::Ident::new("dropshot", proc_macro2::Span::call_site()))
+                        && list.nested.len() == 1
                     {
-                        if let Some(syn::NestedMeta::Meta(
-                            syn::Meta::NameValue(nv),
-                        )) = list.nested.first()
+                        if let Some(syn::NestedMeta::Meta(syn::Meta::NameValue(nv))) =
+                            list.nested.first()
                         {
-                            if nv.path.is_ident(&syn::Ident::new(
-                                "crate",
-                                proc_macro2::Span::call_site(),
-                            )) {
+                            if nv
+                                .path
+                                .is_ident(&syn::Ident::new("crate", proc_macro2::Span::call_site()))
+                            {
                                 if let syn::Lit::Str(s) = &nv.lit {
                                     return Some(s.value());
                                 }
@@ -265,9 +260,7 @@ fn extract_doc_from_attrs(attrs: &Vec<syn::Attribute>) -> Option<String> {
                     if nv.path.is_ident(&doc) {
                         if let syn::Lit::Str(s) = nv.lit {
                             let comment = s.value();
-                            if comment.starts_with(" ")
-                                && !comment.starts_with("  ")
-                            {
+                            if comment.starts_with(" ") && !comment.starts_with("  ") {
                                 // Trim off the first character if the comment
                                 // begins with a single space.
                                 return Some(comment.as_str()[1..].to_string());

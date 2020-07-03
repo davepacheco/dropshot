@@ -23,10 +23,7 @@ pub const CONTENT_TYPE_NDJSON: &str = "application/x-ndjson";
  * If the body fits within the specified cap, a buffer is returned with all the
  * bytes read.  If not, an error is returned.
  */
-pub async fn http_read_body<T>(
-    body: &mut T,
-    cap: usize,
-) -> Result<Bytes, HttpError>
+pub async fn http_read_body<T>(body: &mut T, cap: usize) -> Result<Bytes, HttpError>
 where
     T: HttpBody<Data = Bytes, Error = hyper::error::Error> + std::marker::Unpin,
 {
@@ -140,10 +137,7 @@ pub fn http_extract_path_params<T: DeserializeOwned>(
      */
     let mut jmap = serde_json::map::Map::new();
     for (key, value) in path_params.iter() {
-        jmap.insert(
-            key.clone(),
-            serde_json::value::Value::String(value.clone()),
-        );
+        jmap.insert(key.clone(), serde_json::value::Value::String(value.clone()));
     }
 
     let json_value = serde_json::value::Value::Object(jmap);
@@ -164,9 +158,6 @@ pub fn http_extract_path_params<T: DeserializeOwned>(
          */
         let message = e.to_string();
         assert!(!message.starts_with("missing field: "));
-        HttpError::for_bad_request(
-            None,
-            format!("bad parameter in URL path: {}", message),
-        )
+        HttpError::for_bad_request(None, format!("bad parameter in URL path: {}", message))
     })
 }

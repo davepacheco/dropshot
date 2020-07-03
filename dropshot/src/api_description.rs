@@ -88,12 +88,8 @@ pub enum ApiEndpointParameterName {
 impl From<(ApiEndpointParameterLocation, String)> for ApiEndpointParameterName {
     fn from((location, name): (ApiEndpointParameterLocation, String)) -> Self {
         match location {
-            ApiEndpointParameterLocation::Path => {
-                ApiEndpointParameterName::Path(name)
-            }
-            ApiEndpointParameterLocation::Query => {
-                ApiEndpointParameterName::Query(name)
-            }
+            ApiEndpointParameterLocation::Path => ApiEndpointParameterName::Path(name),
+            ApiEndpointParameterLocation::Query => ApiEndpointParameterName::Query(name),
         }
     }
 }
@@ -170,16 +166,19 @@ impl ApiDescription {
             p.sort();
             v.sort();
 
-            let pp =
-                p.iter().map(|s| s.as_str()).collect::<Vec<&str>>().join(",");
-            let vv =
-                v.iter().map(|s| s.as_str()).collect::<Vec<&str>>().join(",");
+            let pp = p
+                .iter()
+                .map(|s| s.as_str())
+                .collect::<Vec<&str>>()
+                .join(",");
+            let vv = v
+                .iter()
+                .map(|s| s.as_str())
+                .collect::<Vec<&str>>()
+                .join(",");
 
             return match (p.is_empty(), v.is_empty()) {
-                (false, true) => Err(format!(
-                    "{} ({})",
-                    "path parameters are not consumed", pp,
-                )),
+                (false, true) => Err(format!("{} ({})", "path parameters are not consumed", pp,)),
                 (true, false) => Err(format!(
                     "{} ({})",
                     "specified parameters do not appear in the path", vv,
@@ -239,9 +238,10 @@ impl ApiDescription {
         let mut generator = schemars::gen::SchemaGenerator::new(settings);
 
         for (path, method, endpoint) in &self.router {
-            let path = openapi.paths.entry(path).or_insert(
-                openapiv3::ReferenceOr::Item(openapiv3::PathItem::default()),
-            );
+            let path = openapi
+                .paths
+                .entry(path)
+                .or_insert(openapiv3::ReferenceOr::Item(openapiv3::PathItem::default()));
 
             let pathitem = match path {
                 openapiv3::ReferenceOr::Item(ref mut item) => item,
@@ -285,11 +285,9 @@ impl ApiDescription {
                             openapiv3::ReferenceOr::Item(openapiv3::Schema {
                                 schema_data: openapiv3::SchemaData::default(),
                                 // TODO we shouldn't be hard-coding string here
-                                schema_kind: openapiv3::SchemaKind::Type(
-                                    openapiv3::Type::String(
-                                        openapiv3::StringType::default(),
-                                    ),
-                                ),
+                                schema_kind: openapiv3::SchemaKind::Type(openapiv3::Type::String(
+                                    openapiv3::StringType::default(),
+                                )),
                             }),
                         ),
                         example: None,
@@ -297,22 +295,18 @@ impl ApiDescription {
                     };
                     match location {
                         ApiEndpointParameterLocation::Query => {
-                            Some(openapiv3::ReferenceOr::Item(
-                                openapiv3::Parameter::Query {
-                                    parameter_data: parameter_data,
-                                    allow_reserved: true,
-                                    style: openapiv3::QueryStyle::Form,
-                                    allow_empty_value: None,
-                                },
-                            ))
+                            Some(openapiv3::ReferenceOr::Item(openapiv3::Parameter::Query {
+                                parameter_data: parameter_data,
+                                allow_reserved: true,
+                                style: openapiv3::QueryStyle::Form,
+                                allow_empty_value: None,
+                            }))
                         }
                         ApiEndpointParameterLocation::Path => {
-                            Some(openapiv3::ReferenceOr::Item(
-                                openapiv3::Parameter::Path {
-                                    parameter_data: parameter_data,
-                                    style: openapiv3::PathStyle::Simple,
-                                },
-                            ))
+                            Some(openapiv3::ReferenceOr::Item(openapiv3::Parameter::Path {
+                                parameter_data: parameter_data,
+                                style: openapiv3::PathStyle::Simple,
+                            }))
                         }
                     }
                 })
@@ -375,8 +369,7 @@ impl ApiDescription {
 
                 match &endpoint.response.success {
                     None => {
-                        operation.responses.default =
-                            Some(openapiv3::ReferenceOr::Item(response))
+                        operation.responses.default = Some(openapiv3::ReferenceOr::Item(response))
                     }
                     Some(code) => {
                         operation.responses.responses.insert(
@@ -441,9 +434,7 @@ fn is_null(schema: &schemars::schema::Schema) -> bool {
  * The schemars crate also seems a bit inflexible when it comes to how the
  * schema is generated wrt references vs. inline types.
  */
-fn j2oas_schema(
-    schema: &schemars::schema::Schema,
-) -> openapiv3::ReferenceOr<openapiv3::Schema> {
+fn j2oas_schema(schema: &schemars::schema::Schema) -> openapiv3::ReferenceOr<openapiv3::Schema> {
     match schema {
         schemars::schema::Schema::Bool(_) => todo!(),
         schemars::schema::Schema::Object(obj) => j2oas_schema_object(obj),
@@ -461,9 +452,7 @@ fn j2oas_schema_object(
 
     let ty = match &obj.instance_type {
         Some(schemars::schema::SingleOrVec::Single(ty)) => Some(ty.as_ref()),
-        Some(schemars::schema::SingleOrVec::Vec(_)) => {
-            unimplemented!("unsupported by openapiv3")
-        }
+        Some(schemars::schema::SingleOrVec::Vec(_)) => unimplemented!("unsupported by openapiv3"),
         None => None,
     };
 
@@ -472,12 +461,8 @@ fn j2oas_schema_object(
         (Some(schemars::schema::InstanceType::Boolean), None) => {
             openapiv3::SchemaKind::Type(openapiv3::Type::Boolean {})
         }
-        (Some(schemars::schema::InstanceType::Object), None) => {
-            j2oas_object(&obj.object)
-        }
-        (Some(schemars::schema::InstanceType::Array), None) => {
-            j2oas_array(&obj.array)
-        }
+        (Some(schemars::schema::InstanceType::Object), None) => j2oas_object(&obj.object),
+        (Some(schemars::schema::InstanceType::Array), None) => j2oas_array(&obj.array),
         (Some(schemars::schema::InstanceType::Number), None) => {
             j2oas_number(&obj.format, &obj.number, &obj.enum_values)
         }
@@ -509,9 +494,7 @@ fn j2oas_schema_object(
     })
 }
 
-fn j2oas_subschemas(
-    subschemas: &schemars::schema::SubschemaValidation,
-) -> openapiv3::SchemaKind {
+fn j2oas_subschemas(subschemas: &schemars::schema::SubschemaValidation) -> openapiv3::SchemaKind {
     match (&subschemas.all_of, &subschemas.any_of, &subschemas.one_of) {
         (Some(all_of), None, None) => openapiv3::SchemaKind::AllOf {
             all_of: all_of
@@ -543,63 +526,52 @@ fn j2oas_integer(
 ) -> openapiv3::SchemaKind {
     let format = match format.as_ref().map(|s| s.as_str()) {
         None => openapiv3::VariantOrUnknownOrEmpty::Empty,
-        Some("int32") => openapiv3::VariantOrUnknownOrEmpty::Item(
-            openapiv3::IntegerFormat::Int32,
-        ),
-        Some("int64") => openapiv3::VariantOrUnknownOrEmpty::Item(
-            openapiv3::IntegerFormat::Int64,
-        ),
-        Some(other) => {
-            openapiv3::VariantOrUnknownOrEmpty::Unknown(other.to_string())
-        }
+        Some("int32") => openapiv3::VariantOrUnknownOrEmpty::Item(openapiv3::IntegerFormat::Int32),
+        Some("int64") => openapiv3::VariantOrUnknownOrEmpty::Item(openapiv3::IntegerFormat::Int64),
+        Some(other) => openapiv3::VariantOrUnknownOrEmpty::Unknown(other.to_string()),
     };
 
-    let (multiple_of, minimum, exclusive_minimum, maximum, exclusive_maximum) =
-        match number {
-            None => (None, None, false, None, false),
-            Some(number) => {
-                let multiple_of = number.multiple_of.map(|f| f as i64);
-                let (minimum, exclusive_minimum) =
-                    match (number.minimum, number.exclusive_minimum) {
-                        (None, None) => (None, false),
-                        (Some(f), None) => (Some(f as i64), false),
-                        (None, Some(f)) => (Some(f as i64), true),
-                        _ => panic!("invalid"),
-                    };
-                let (maximum, exclusive_maximum) =
-                    match (number.maximum, number.exclusive_maximum) {
-                        (None, None) => (None, false),
-                        (Some(f), None) => (Some(f as i64), false),
-                        (None, Some(f)) => (Some(f as i64), true),
-                        _ => panic!("invalid"),
-                    };
+    let (multiple_of, minimum, exclusive_minimum, maximum, exclusive_maximum) = match number {
+        None => (None, None, false, None, false),
+        Some(number) => {
+            let multiple_of = number.multiple_of.map(|f| f as i64);
+            let (minimum, exclusive_minimum) = match (number.minimum, number.exclusive_minimum) {
+                (None, None) => (None, false),
+                (Some(f), None) => (Some(f as i64), false),
+                (None, Some(f)) => (Some(f as i64), true),
+                _ => panic!("invalid"),
+            };
+            let (maximum, exclusive_maximum) = match (number.maximum, number.exclusive_maximum) {
+                (None, None) => (None, false),
+                (Some(f), None) => (Some(f as i64), false),
+                (None, Some(f)) => (Some(f as i64), true),
+                _ => panic!("invalid"),
+            };
 
-                (
-                    multiple_of,
-                    minimum,
-                    exclusive_minimum,
-                    maximum,
-                    exclusive_maximum,
-                )
-            }
-        };
+            (
+                multiple_of,
+                minimum,
+                exclusive_minimum,
+                maximum,
+                exclusive_maximum,
+            )
+        }
+    };
 
     let enumeration = enum_values
         .iter()
         .flat_map(|v| v.iter().map(|vv| vv.as_u64().unwrap() as i64))
         .collect::<Vec<_>>();
 
-    openapiv3::SchemaKind::Type(openapiv3::Type::Integer(
-        openapiv3::IntegerType {
-            format,
-            multiple_of,
-            exclusive_minimum,
-            exclusive_maximum,
-            minimum,
-            maximum,
-            enumeration,
-        },
-    ))
+    openapiv3::SchemaKind::Type(openapiv3::Type::Integer(openapiv3::IntegerType {
+        format,
+        multiple_of,
+        exclusive_minimum,
+        exclusive_maximum,
+        minimum,
+        maximum,
+        enumeration,
+    }))
 }
 
 fn j2oas_number(
@@ -609,63 +581,52 @@ fn j2oas_number(
 ) -> openapiv3::SchemaKind {
     let format = match format.as_ref().map(|s| s.as_str()) {
         None => openapiv3::VariantOrUnknownOrEmpty::Empty,
-        Some("float") => openapiv3::VariantOrUnknownOrEmpty::Item(
-            openapiv3::NumberFormat::Float,
-        ),
-        Some("double") => openapiv3::VariantOrUnknownOrEmpty::Item(
-            openapiv3::NumberFormat::Double,
-        ),
-        Some(other) => {
-            openapiv3::VariantOrUnknownOrEmpty::Unknown(other.to_string())
-        }
+        Some("float") => openapiv3::VariantOrUnknownOrEmpty::Item(openapiv3::NumberFormat::Float),
+        Some("double") => openapiv3::VariantOrUnknownOrEmpty::Item(openapiv3::NumberFormat::Double),
+        Some(other) => openapiv3::VariantOrUnknownOrEmpty::Unknown(other.to_string()),
     };
 
-    let (multiple_of, minimum, exclusive_minimum, maximum, exclusive_maximum) =
-        match number {
-            None => (None, None, false, None, false),
-            Some(number) => {
-                let multiple_of = number.multiple_of;
-                let (minimum, exclusive_minimum) =
-                    match (number.minimum, number.exclusive_minimum) {
-                        (None, None) => (None, false),
-                        (s @ Some(_), None) => (s, false),
-                        (None, s @ Some(_)) => (s, true),
-                        _ => panic!("invalid"),
-                    };
-                let (maximum, exclusive_maximum) =
-                    match (number.maximum, number.exclusive_maximum) {
-                        (None, None) => (None, false),
-                        (s @ Some(_), None) => (s, false),
-                        (None, s @ Some(_)) => (s, true),
-                        _ => panic!("invalid"),
-                    };
+    let (multiple_of, minimum, exclusive_minimum, maximum, exclusive_maximum) = match number {
+        None => (None, None, false, None, false),
+        Some(number) => {
+            let multiple_of = number.multiple_of;
+            let (minimum, exclusive_minimum) = match (number.minimum, number.exclusive_minimum) {
+                (None, None) => (None, false),
+                (s @ Some(_), None) => (s, false),
+                (None, s @ Some(_)) => (s, true),
+                _ => panic!("invalid"),
+            };
+            let (maximum, exclusive_maximum) = match (number.maximum, number.exclusive_maximum) {
+                (None, None) => (None, false),
+                (s @ Some(_), None) => (s, false),
+                (None, s @ Some(_)) => (s, true),
+                _ => panic!("invalid"),
+            };
 
-                (
-                    multiple_of,
-                    minimum,
-                    exclusive_minimum,
-                    maximum,
-                    exclusive_maximum,
-                )
-            }
-        };
+            (
+                multiple_of,
+                minimum,
+                exclusive_minimum,
+                maximum,
+                exclusive_maximum,
+            )
+        }
+    };
 
     let enumeration = enum_values
         .iter()
         .flat_map(|v| v.iter().map(|vv| vv.as_f64().unwrap() as f64))
         .collect::<Vec<_>>();
 
-    openapiv3::SchemaKind::Type(openapiv3::Type::Number(
-        openapiv3::NumberType {
-            format,
-            multiple_of,
-            exclusive_minimum,
-            exclusive_maximum,
-            minimum,
-            maximum,
-            enumeration,
-        },
-    ))
+    openapiv3::SchemaKind::Type(openapiv3::Type::Number(openapiv3::NumberType {
+        format,
+        multiple_of,
+        exclusive_minimum,
+        exclusive_maximum,
+        minimum,
+        maximum,
+        enumeration,
+    }))
 }
 
 fn j2oas_string(
@@ -675,24 +636,16 @@ fn j2oas_string(
 ) -> openapiv3::SchemaKind {
     let format = match format.as_ref().map(|s| s.as_str()) {
         None => openapiv3::VariantOrUnknownOrEmpty::Empty,
-        Some("date") => openapiv3::VariantOrUnknownOrEmpty::Item(
-            openapiv3::StringFormat::Date,
-        ),
-        Some("date-time") => openapiv3::VariantOrUnknownOrEmpty::Item(
-            openapiv3::StringFormat::DateTime,
-        ),
-        Some("password") => openapiv3::VariantOrUnknownOrEmpty::Item(
-            openapiv3::StringFormat::Password,
-        ),
-        Some("byte") => openapiv3::VariantOrUnknownOrEmpty::Item(
-            openapiv3::StringFormat::Byte,
-        ),
-        Some("binary") => openapiv3::VariantOrUnknownOrEmpty::Item(
-            openapiv3::StringFormat::Binary,
-        ),
-        Some(other) => {
-            openapiv3::VariantOrUnknownOrEmpty::Unknown(other.to_string())
+        Some("date") => openapiv3::VariantOrUnknownOrEmpty::Item(openapiv3::StringFormat::Date),
+        Some("date-time") => {
+            openapiv3::VariantOrUnknownOrEmpty::Item(openapiv3::StringFormat::DateTime)
         }
+        Some("password") => {
+            openapiv3::VariantOrUnknownOrEmpty::Item(openapiv3::StringFormat::Password)
+        }
+        Some("byte") => openapiv3::VariantOrUnknownOrEmpty::Item(openapiv3::StringFormat::Byte),
+        Some("binary") => openapiv3::VariantOrUnknownOrEmpty::Item(openapiv3::StringFormat::Binary),
+        Some(other) => openapiv3::VariantOrUnknownOrEmpty::Unknown(other.to_string()),
     };
 
     let (max_length, min_length, pattern) = match string.as_ref() {
@@ -709,20 +662,16 @@ fn j2oas_string(
         .flat_map(|v| v.iter().map(|vv| vv.as_str().unwrap().to_string()))
         .collect::<Vec<_>>();
 
-    openapiv3::SchemaKind::Type(openapiv3::Type::String(
-        openapiv3::StringType {
-            format,
-            pattern,
-            enumeration,
-            min_length,
-            max_length,
-        },
-    ))
+    openapiv3::SchemaKind::Type(openapiv3::Type::String(openapiv3::StringType {
+        format,
+        pattern,
+        enumeration,
+        min_length,
+        max_length,
+    }))
 }
 
-fn j2oas_array(
-    array: &Option<Box<schemars::schema::ArrayValidation>>,
-) -> openapiv3::SchemaKind {
+fn j2oas_array(array: &Option<Box<schemars::schema::ArrayValidation>>) -> openapiv3::SchemaKind {
     let arr = array.as_ref().unwrap();
 
     openapiv3::SchemaKind::Type(openapiv3::Type::Array(openapiv3::ArrayType {
@@ -738,49 +687,33 @@ fn j2oas_array(
     }))
 }
 
-fn box_reference_or<T>(
-    r: openapiv3::ReferenceOr<T>,
-) -> openapiv3::ReferenceOr<Box<T>> {
+fn box_reference_or<T>(r: openapiv3::ReferenceOr<T>) -> openapiv3::ReferenceOr<Box<T>> {
     match r {
-        openapiv3::ReferenceOr::Item(schema) => {
-            openapiv3::ReferenceOr::boxed_item(schema)
+        openapiv3::ReferenceOr::Item(schema) => openapiv3::ReferenceOr::boxed_item(schema),
+        openapiv3::ReferenceOr::Reference { reference } => {
+            openapiv3::ReferenceOr::Reference { reference }
         }
-        openapiv3::ReferenceOr::Reference {
-            reference,
-        } => openapiv3::ReferenceOr::Reference {
-            reference,
-        },
     }
 }
 
-fn j2oas_object(
-    object: &Option<Box<schemars::schema::ObjectValidation>>,
-) -> openapiv3::SchemaKind {
+fn j2oas_object(object: &Option<Box<schemars::schema::ObjectValidation>>) -> openapiv3::SchemaKind {
     match object {
-        None => openapiv3::SchemaKind::Type(openapiv3::Type::Object(
-            openapiv3::ObjectType::default(),
-        )),
-        Some(obj) => openapiv3::SchemaKind::Type(openapiv3::Type::Object(
-            openapiv3::ObjectType {
-                properties: obj
-                    .properties
-                    .iter()
-                    .map(|(prop, schema)| {
-                        (prop.clone(), box_reference_or(j2oas_schema(schema)))
-                    })
-                    .collect::<_>(),
-                required: obj.required.iter().cloned().collect::<_>(),
-                additional_properties: obj.additional_properties.as_ref().map(
-                    |schema| {
-                        openapiv3::AdditionalProperties::Schema(Box::new(
-                            j2oas_schema(schema),
-                        ))
-                    },
-                ),
-                min_properties: obj.min_properties.map(|n| n as usize),
-                max_properties: obj.max_properties.map(|n| n as usize),
-            },
-        )),
+        None => {
+            openapiv3::SchemaKind::Type(openapiv3::Type::Object(openapiv3::ObjectType::default()))
+        }
+        Some(obj) => openapiv3::SchemaKind::Type(openapiv3::Type::Object(openapiv3::ObjectType {
+            properties: obj
+                .properties
+                .iter()
+                .map(|(prop, schema)| (prop.clone(), box_reference_or(j2oas_schema(schema))))
+                .collect::<_>(),
+            required: obj.required.iter().cloned().collect::<_>(),
+            additional_properties: obj.additional_properties.as_ref().map(|schema| {
+                openapiv3::AdditionalProperties::Schema(Box::new(j2oas_schema(schema)))
+            }),
+            min_properties: obj.min_properties.map(|n| n as usize),
+            max_properties: obj.max_properties.map(|n| n as usize),
+        })),
     }
 }
 
@@ -803,9 +736,7 @@ mod test {
     use serde::Deserialize;
     use std::sync::Arc;
 
-    async fn test_handler(
-        _: Arc<RequestContext>,
-    ) -> Result<Response<Body>, HttpError> {
+    async fn test_handler(_: Arc<RequestContext>) -> Result<Response<Body>, HttpError> {
         panic!("test handler is not supposed to run");
     }
 
@@ -813,11 +744,7 @@ mod test {
         HttpRouteHandler::new_with_name(test_handler, name)
     }
 
-    fn new_endpoint(
-        handler: Box<dyn RouteHandler>,
-        method: Method,
-        path: &str,
-    ) -> ApiEndpoint {
+    fn new_endpoint(handler: Box<dyn RouteHandler>, method: Method, path: &str) -> ApiEndpoint {
         ApiEndpoint {
             operation_id: "testOperation".to_string(),
             handler: handler,
@@ -887,8 +814,7 @@ mod test {
         ));
         assert_eq!(
             ret,
-            Err("specified parameters do not appear in the path (a,b)"
-                .to_string())
+            Err("specified parameters do not appear in the path (a,b)".to_string())
         )
     }
 

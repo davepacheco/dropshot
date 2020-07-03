@@ -22,9 +22,7 @@ fn test_config_bad_bind_address_port_too_small() {
     )
     .unwrap_err()
     .to_string();
-    assert!(
-        error.starts_with("invalid IP address syntax for key `bind_address`")
-    );
+    assert!(error.starts_with("invalid IP address syntax for key `bind_address`"));
 }
 
 #[test]
@@ -35,36 +33,28 @@ fn test_config_bad_bind_address_port_too_large() {
     )
     .unwrap_err()
     .to_string();
-    assert!(
-        error.starts_with("invalid IP address syntax for key `bind_address`")
-    );
+    assert!(error.starts_with("invalid IP address syntax for key `bind_address`"));
 }
 
 #[test]
 fn test_config_bad_bind_address_garbage() {
-    let error = read_config::<ConfigDropshot>(
-        "bad_bind_address_garbage",
-        "bind_address = \"garbage\"",
-    )
-    .unwrap_err()
-    .to_string();
-    assert!(
-        error.starts_with("invalid IP address syntax for key `bind_address`")
-    );
+    let error =
+        read_config::<ConfigDropshot>("bad_bind_address_garbage", "bind_address = \"garbage\"")
+            .unwrap_err()
+            .to_string();
+    assert!(error.starts_with("invalid IP address syntax for key `bind_address`"));
 }
 
 fn make_server(config: &ConfigDropshot, log: &Logger) -> HttpServer {
-    HttpServer::new(&config, dropshot::ApiDescription::new(), Arc::new(0), log)
-        .unwrap()
+    HttpServer::new(&config, dropshot::ApiDescription::new(), Arc::new(0), log).unwrap()
 }
 
 #[tokio::test]
 async fn test_config_bind_address() {
-    let log_path =
-        dropshot::test_util::log_file_for_test("config_bind_address")
-            .as_path()
-            .display()
-            .to_string();
+    let log_path = dropshot::test_util::log_file_for_test("config_bind_address")
+        .as_path()
+        .display()
+        .to_string();
     eprintln!("log file: {}", log_path);
 
     let log_config = dropshot::ConfigLogging::File {
@@ -112,10 +102,8 @@ async fn test_config_bind_address() {
      * don't want to depend on too much from the ApiServer here -- but we
      * should have successfully made the request.)
      */
-    let config_text =
-        format!("bind_address = \"{}:{}\"\n", bind_ip_str, bind_port);
-    let config =
-        read_config::<ConfigDropshot>("bind_address", &config_text).unwrap();
+    let config_text = format!("bind_address = \"{}:{}\"\n", bind_ip_str, bind_port);
+    let config = read_config::<ConfigDropshot>("bind_address", &config_text).unwrap();
     let mut server = make_server(&config, &log);
     let task = server.run();
     client.request(cons_request(bind_port)).await.unwrap();
@@ -133,10 +121,8 @@ async fn test_config_bind_address() {
      * Start a server on another TCP port and make sure we can reach that
      * one (and NOT the one we just shut down).
      */
-    let config_text =
-        format!("bind_address = \"{}:{}\"\n", bind_ip_str, bind_port + 1,);
-    let config =
-        read_config::<ConfigDropshot>("bind_address", &config_text).unwrap();
+    let config_text = format!("bind_address = \"{}:{}\"\n", bind_ip_str, bind_port + 1,);
+    let config = read_config::<ConfigDropshot>("bind_address", &config_text).unwrap();
     let mut server = make_server(&config, &log);
     let task = server.run();
     client.request(cons_request(bind_port + 1)).await.unwrap();
@@ -147,7 +133,10 @@ async fn test_config_bind_address() {
 
     let error = client.request(cons_request(bind_port)).await.unwrap_err();
     assert!(error.is_connect());
-    let error = client.request(cons_request(bind_port + 1)).await.unwrap_err();
+    let error = client
+        .request(cons_request(bind_port + 1))
+        .await
+        .unwrap_err();
     assert!(error.is_connect());
 
     fs::remove_file(log_path).unwrap();

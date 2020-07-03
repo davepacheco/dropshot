@@ -88,7 +88,9 @@ async fn test_demo1() {
     let testctx = test_setup("demo1");
 
     let private = testctx.server.app_private();
-    let p = private.downcast::<usize>().expect("wrong type for private data");
+    let p = private
+        .downcast::<usize>()
+        .expect("wrong type for private data");
     assert_eq!(*p, 0);
 
     let mut response = testctx
@@ -283,9 +285,9 @@ async fn test_demo2json() {
         )
         .await
         .expect_err("expected failure");
-    assert!(error.message.starts_with(
-        "unable to parse body: invalid type: string \"oops\", expected u32"
-    ));
+    assert!(error
+        .message
+        .starts_with("unable to parse body: invalid type: string \"oops\", expected u32"));
 
     testctx.teardown().await;
 }
@@ -383,12 +385,7 @@ async fn test_demo_path_param_string() {
     for bad_path in bad_paths {
         let error = testctx
             .client_testctx
-            .make_request_with_body(
-                Method::GET,
-                bad_path,
-                Body::empty(),
-                StatusCode::NOT_FOUND,
-            )
+            .make_request_with_body(Method::GET, bad_path, Body::empty(), StatusCode::NOT_FOUND)
             .await
             .unwrap_err();
         assert_eq!(error.message, "Not Found");
@@ -419,12 +416,7 @@ async fn test_demo_path_param_string() {
     for (okay_path, matched_part) in okay_paths {
         let mut response = testctx
             .client_testctx
-            .make_request_with_body(
-                Method::GET,
-                okay_path,
-                Body::empty(),
-                StatusCode::OK,
-            )
+            .make_request_with_body(Method::GET, okay_path, Body::empty(), StatusCode::OK)
             .await
             .unwrap();
         let json: DemoPathString = read_json(&mut response).await;
@@ -462,12 +454,7 @@ async fn test_demo_path_param_uuid() {
     let valid_path = format!("/testing/demo_path_uuid/{}", uuid_str);
     let mut response = testctx
         .client_testctx
-        .make_request_with_body(
-            Method::GET,
-            &valid_path,
-            Body::empty(),
-            StatusCode::OK,
-        )
+        .make_request_with_body(Method::GET, &valid_path, Body::empty(), StatusCode::OK)
         .await
         .unwrap();
     let json: DemoPathUuid = read_json(&mut response).await;
@@ -489,7 +476,9 @@ pub fn register_test_endpoints(api: &mut ApiDescription) {
      * We don't need to exhaustively test these cases, as they're tested by unit
      * tests.
      */
-    let error = api.register(demo_handler_path_param_impossible).unwrap_err();
+    let error = api
+        .register(demo_handler_path_param_impossible)
+        .unwrap_err();
     assert_eq!(
         error,
         "path parameters are not consumed (different_param_name) and \
@@ -501,9 +490,7 @@ pub fn register_test_endpoints(api: &mut ApiDescription) {
     method = GET,
     path = "/testing/demo1",
 }]
-async fn demo_handler_args_1(
-    _rqctx: Arc<RequestContext>,
-) -> Result<Response<Body>, HttpError> {
+async fn demo_handler_args_1(_rqctx: Arc<RequestContext>) -> Result<Response<Body>, HttpError> {
     http_echo(&"demo_handler_args_1")
 }
 
