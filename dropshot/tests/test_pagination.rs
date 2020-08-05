@@ -536,8 +536,8 @@ async fn api_dictionary(
     };
 
     let iter = dictionary.range::<String, _>(range_bounds);
-    let iter: Box<dyn Iterator<Item = &String>> =
-        if reverse { Box::new(iter) } else { Box::new(iter.rev()) };
+    let iter: dyn Iterator<Item = &String> =
+        if reverse { iter } else { iter.rev() };
     let iter = iter.filter_map(|word| {
         if word.len() >= scan_params.min_length {
             Some(DictionaryWord {
