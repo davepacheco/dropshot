@@ -12,6 +12,7 @@ use dropshot::EmptyScanParams;
 use dropshot::ExtractedParameter;
 use dropshot::HttpError;
 use dropshot::HttpResponseOkObject;
+use dropshot::PaginationOrder;
 use dropshot::PaginationParams;
 use dropshot::Query;
 use dropshot::RequestContext;
@@ -22,13 +23,16 @@ use http::StatusCode;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
-use std::ops::Range;
+use std::collections::BTreeSet;
+use std::ops::Bound;
 use std::sync::atomic::AtomicU16;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 #[macro_use]
 extern crate slog;
+#[macro_use]
+extern crate lazy_static;
 
 mod common;
 
@@ -91,7 +95,18 @@ fn paginate_api() -> ApiDescription {
     api.register(api_integers).unwrap();
     api.register(api_empty).unwrap();
     api.register(api_with_extra_params).unwrap();
+    api.register(api_dictionary).unwrap();
     api
+}
+
+fn range_u16(start: u16, limit: u16) -> Vec<u16> {
+    if start < std::u16::MAX {
+        let start = start + 1;
+        let end = start.checked_add(limit).unwrap_or(std::u16::MAX);
+        (start..end).collect()
+    } else {
+        Vec::new()
+    }
 }
 
 /*
@@ -120,16 +135,8 @@ async fn api_integers(
         }) => *last_seen,
     };
 
-    let results = if start < std::u16::MAX {
-        let start = start + 1;
-        let end = start.checked_add(limit).unwrap_or(std::u16::MAX);
-        (start..end).collect()
-    } else {
-        Vec::new()
-    };
-
     Ok(HttpResponseOkObject(ResultsPage::new(
-        results,
+        range_u16(start, limit),
         &EmptyScanParams {},
         page_selector_for,
     )?))
@@ -138,7 +145,7 @@ async fn api_integers(
 #[tokio::test]
 async fn test_paginate_errors() {
     let api = paginate_api();
-    let testctx = common::test_setup("paginate_errors", api);
+    let testctx = common::test_setup("errors", api);
     let client = &testctx.client_testctx;
 
     struct ErrorTestCase {
@@ -181,7 +188,7 @@ async fn test_paginate_errors() {
 #[tokio::test]
 async fn test_paginate_basic() {
     let api = paginate_api();
-    let testctx = common::test_setup("paginate_basic", api);
+    let testctx = common::test_setup("basic", api);
     let client = &testctx.client_testctx;
 
     /*
@@ -332,7 +339,7 @@ async fn api_empty(
 #[tokio::test]
 async fn test_paginate_empty() {
     let api = paginate_api();
-    let testctx = common::test_setup("paginate_empty", api);
+    let testctx = common::test_setup("empty", api);
     let client = &testctx.client_testctx;
 
     let page = objects_list_page::<u16>(&client, "/empty").await;
@@ -347,14 +354,16 @@ async fn test_paginate_empty() {
         &client,
         "/empty?limit=0",
         "unable to parse query string: expected a non-zero value",
-    ).await;
+    )
+    .await;
 
     assert_error(
         &client,
         "/empty?page_token=q",
         "unable to parse query string: failed to parse pagination token: \
          Encoded text cannot have a 6-bit remainder.",
-    ).await;
+    )
+    .await;
 
     testctx.teardown().await;
 }
@@ -382,7 +391,6 @@ async fn api_with_extra_params(
     let limit = rqctx.page_limit(&pag_params)?.get() as u16;
     let extra_params = query_extra.into_inner();
 
-    /* XXX see previous function */
     let start = match &pag_params.page {
         WhichPage::First(..) => 0,
         WhichPage::Next(IntegersPageSelector {
@@ -390,17 +398,11 @@ async fn api_with_extra_params(
         }) => *last_seen,
     };
 
-    let results = Range {
-        start: start + 1,
-        end: start + limit + 1,
-    }
-    .collect();
-
     Ok(HttpResponseOkObject(ExtraResultsPage {
         debug_was_set: extra_params.debug.is_some(),
         debug_value: extra_params.debug.unwrap_or(false),
         page: ResultsPage::new(
-            results,
+            range_u16(start, limit),
             &EmptyScanParams {},
             page_selector_for,
         )?,
@@ -425,7 +427,7 @@ struct ExtraResultsPage {
 #[tokio::test]
 async fn test_paginate_extra_params() {
     let api = paginate_api();
-    let testctx = common::test_setup("paginate_extra_params", api);
+    let testctx = common::test_setup("extra_params", api);
     let client = &testctx.client_testctx;
 
     /* Test that the extra query parameter is optional. */
@@ -459,4 +461,224 @@ async fn test_paginate_extra_params() {
     assert!(page.page.next_page.is_some());
 
     testctx.teardown().await;
+}
+
+/*
+ * Test an endpoint with scan options that returns custom structures.  Our
+ * endpoint will return a list of words, with the marker being the last word
+ * seen.
+ */
+
+lazy_static! {
+    static ref WORD_LIST: BTreeSet<String> = make_word_list();
+}
+
+fn make_word_list() -> BTreeSet<String> {
+    let word_list = include_str!("wordlist.txt");
+    word_list.lines().map(|s| s.to_string()).collect()
+}
+
+/*
+ * The use of a structure here is kind of pointless except to exercise the case
+ * of endpoints that return a custom structure.
+ */
+#[derive(Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+struct DictionaryWord {
+    word: String,
+    length: usize,
+}
+
+#[derive(Clone, Deserialize, ExtractedParameter, Serialize)]
+struct DictionaryScanParams {
+    #[serde(default = "ascending")]
+    order: PaginationOrder,
+    #[serde(default)]
+    /* Work around serde-rs/serde#1183 */
+    #[serde(with = "serde_with::rust::display_fromstr")]
+    min_length: usize,
+}
+
+fn ascending() -> PaginationOrder {
+    PaginationOrder::Ascending
+}
+
+#[derive(Deserialize, Serialize)]
+struct DictionaryPageSelector {
+    scan: DictionaryScanParams,
+    last_seen: String,
+}
+
+#[endpoint {
+    method = GET,
+    path = "/dictionary",
+}]
+async fn api_dictionary(
+    rqctx: Arc<RequestContext>,
+    query: Query<
+        PaginationParams<DictionaryScanParams, DictionaryPageSelector>,
+    >,
+) -> Result<HttpResponseOkObject<ResultsPage<DictionaryWord>>, HttpError> {
+    let pag_params = query.into_inner();
+    let limit = rqctx.page_limit(&pag_params)?.get();
+    let dictionary: &BTreeSet<String> = &*WORD_LIST;
+
+    let (bound, scan_params) = match &pag_params.page {
+        WhichPage::First(scan) => (Bound::Unbounded, scan),
+        WhichPage::Next(DictionaryPageSelector {
+            scan,
+            last_seen,
+        }) => (Bound::Excluded(last_seen), scan),
+    };
+
+    let (range_bounds, reverse) = match scan_params.order {
+        PaginationOrder::Ascending => ((bound, Bound::Unbounded), true),
+        PaginationOrder::Descending => ((Bound::Unbounded, bound), false),
+    };
+
+    let iter = dictionary.range::<String, _>(range_bounds);
+    let iter: Box<dyn Iterator<Item = &String>> =
+        if reverse { Box::new(iter) } else { Box::new(iter.rev()) };
+    let iter = iter.filter_map(|word| {
+        if word.len() >= scan_params.min_length {
+            Some(DictionaryWord {
+                word: word.clone(),
+                length: word.len(),
+            })
+        } else {
+            None
+        }
+    });
+
+    Ok(HttpResponseOkObject(ResultsPage::new(
+        iter.take(limit).collect(),
+        scan_params,
+        |item: &DictionaryWord, scan_params: &DictionaryScanParams| {
+            DictionaryPageSelector {
+                scan: scan_params.clone(),
+                last_seen: item.word.clone(),
+            }
+        },
+    )?))
+}
+
+#[tokio::test]
+async fn test_paginate_dictionary() {
+    let api = paginate_api();
+    let testctx = common::test_setup("dictionary", api);
+    let client = &testctx.client_testctx;
+
+    /* simple case */
+    let page =
+        objects_list_page::<DictionaryWord>(&client, "/dictionary?limit=3")
+            .await;
+    assert_eq!(page.items, vec![
+        DictionaryWord {
+            word: "A&M".to_string(),
+            length: 3
+        },
+        DictionaryWord {
+            word: "A&P".to_string(),
+            length: 3
+        },
+        DictionaryWord {
+            word: "AAA".to_string(),
+            length: 3
+        },
+    ]);
+    let token = page.next_page.unwrap();
+    let page = objects_list_page::<DictionaryWord>(
+        &client,
+        &format!("/dictionary?limit=3&page_token={}", token),
+    )
+    .await;
+    assert_eq!(page.items, vec![
+        DictionaryWord {
+            word: "AAAS".to_string(),
+            length: 4
+        },
+        DictionaryWord {
+            word: "ABA".to_string(),
+            length: 3
+        },
+        DictionaryWord {
+            word: "AC".to_string(),
+            length: 2
+        },
+    ]);
+
+    /* Reverse the order. */
+    let page = objects_list_page::<DictionaryWord>(
+        &client,
+        "/dictionary?limit=3&order=descending",
+    )
+    .await;
+    assert_eq!(page.items, vec![
+        DictionaryWord {
+            word: "zygote".to_string(),
+            length: 6
+        },
+        DictionaryWord {
+            word: "zucchini".to_string(),
+            length: 8
+        },
+        DictionaryWord {
+            word: "zounds".to_string(),
+            length: 6
+        },
+    ]);
+    let token = page.next_page.unwrap();
+    /* Critically, we don't have to pass order=descending again. */
+    let page = objects_list_page::<DictionaryWord>(
+        &client,
+        &format!("/dictionary?limit=3&page_token={}", token),
+    )
+    .await;
+    assert_eq!(page.items, vec![
+        DictionaryWord {
+            word: "zooplankton".to_string(),
+            length: 11
+        },
+        DictionaryWord {
+            word: "zoom".to_string(),
+            length: 4
+        },
+        DictionaryWord {
+            word: "zoology".to_string(),
+            length: 7
+        },
+    ]);
+
+    /* Apply a filter. */
+    let page = objects_list_page::<DictionaryWord>(
+        &client,
+        "/dictionary?limit=3&min_length=12",
+    )
+    .await;
+    let found_words =
+        page.items.iter().map(|dw| dw.word.as_str()).collect::<Vec<&str>>();
+    assert_eq!(found_words, vec![
+        "Addressograph",
+        "Aristotelean",
+        "Aristotelian",
+    ]);
+    let token = page.next_page.unwrap();
+    let page = objects_list_page::<DictionaryWord>(
+        &client,
+        &format!("/dictionary?limit=3&page_token={}", token),
+    )
+    .await;
+    assert_eq!(page.items, vec![
+        DictionaryWord {
+            word: "Bhagavadgita".to_string(),
+            length: 12
+        },
+        DictionaryWord {
+            word: "Brontosaurus".to_string(),
+            length: 12
+        },
+        DictionaryWord {
+            word: "Cantabrigian".to_string(),
+            length: 12
+        },
+    ]);
 }
